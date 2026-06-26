@@ -13,21 +13,13 @@ const html = /* html */ `<!DOCTYPE html>
     <style>
         * { margin: 0; padding: 0; box-sizing: border-box; }
         body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; background: #fff; color: #222; overflow: hidden; }
-        
-        /* Setup / Login Screen */
         .setup-screen { display: flex; align-items: center; justify-content: center; height: 100vh; padding: 20px; background: #f9f9f9; }
         .setup-card { width: 100%; max-width: 400px; background: #fff; padding: 40px 20px; text-align: center; border-radius: 12px; box-shadow: 0 4px 15px rgba(0,0,0,0.08); }
         .setup-card h1 { font-size: 28px; margin-bottom: 30px; color: #000; font-weight: 600; }
         .setup-card input { width: 100%; padding: 12px 16px; margin-bottom: 15px; border: 1px solid #ddd; border-radius: 8px; font-size: 16px; outline: none; }
-        .setup-card input:focus { border-color: #0084ff; }
         .setup-card button { width: 100%; padding: 12px; background: #0084ff; color: white; border: none; border-radius: 8px; font-size: 16px; cursor: pointer; font-weight: 600; }
-        .setup-card button:hover { background: #0073e6; }
         .setup-card .error { color: #e74c3c; margin-top: 10px; font-size: 14px; }
-        
-        /* Main Container */
         .container { display: flex; height: 100vh; width: 100vw; position: relative; overflow: hidden; }
-        
-        /* Sidebar */
         .sidebar { width: 320px; border-right: 1px solid #e5e5e5; display: flex; flex-direction: column; background: #fff; z-index: 2; height: 100%; transition: transform 0.3s ease; }
         .sidebar-header { padding: 16px; border-bottom: 1px solid #e5e5e5; }
         .sidebar-header h2 { font-size: 28px; font-weight: 800; margin-bottom: 12px; }
@@ -35,8 +27,6 @@ const html = /* html */ `<!DOCTYPE html>
         .add-contact-section { padding: 12px 16px; display: flex; gap: 8px; border-bottom: 1px solid #f5f5f5; }
         .add-contact-section input { flex: 1; padding: 10px 12px; border: 1px solid #ddd; border-radius: 8px; font-size: 14px; outline: none; }
         .add-contact-section button { padding: 10px 16px; background: #0084ff; color: white; border: none; border-radius: 8px; cursor: pointer; font-weight: 600; font-size: 14px; }
-        
-        /* Chat List */
         .chat-list { flex: 1; overflow-y: auto; }
         .chat-item { padding: 14px 16px; border-bottom: 1px solid #fcfcfc; cursor: pointer; display: flex; align-items: center; gap: 12px; }
         .chat-item.active { background: #e7f3ff; }
@@ -44,16 +34,12 @@ const html = /* html */ `<!DOCTYPE html>
         .chat-info { flex: 1; min-width: 0; }
         .chat-info h3 { font-size: 15px; font-weight: 600; margin: 0; }
         .chat-info p { font-size: 13px; color: #888; margin: 3px 0 0 0; }
-        
-        /* Main Chat Window */
         .main { flex: 1; display: flex; flex-direction: column; background: #fff; height: 100%; position: relative; }
         .chat-header { padding: 14px 20px; border-bottom: 1px solid #e5e5e5; display: flex; align-items: center; gap: 12px; background: #fff; }
         .back-btn { display: none; background: none; border: none; font-size: 24px; cursor: pointer; color: #0084ff; }
         .chat-header-info { flex: 1; }
         .chat-header-info h2 { font-size: 16px; font-weight: 600; margin: 0; }
         .chat-header-info p { font-size: 12px; color: #2ecc71; margin: 2px 0 0 0; }
-        
-        /* Messages Frame */
         .messages-area { flex: 1; overflow-y: auto; padding: 16px; display: flex; flex-direction: column; gap: 10px; background: #fdfdfd; }
         .message { display: flex; margin-bottom: 2px; }
         .message.sent { justify-content: flex-end; }
@@ -65,26 +51,18 @@ const html = /* html */ `<!DOCTYPE html>
         .message.sent .message-bubble { background: #0084ff; color: white; border-bottom-right-radius: 4px; }
         .message.received .message-bubble { background: #e5e5ea; color: #000; border-bottom-left-radius: 4px; }
         .message-time { font-size: 10px; color: #999; margin-top: 4px; padding: 0 4px; }
-        
-        /* Audio Player Styling */
         audio { max-width: 240px; margin-top: 4px; border-radius: 8px; outline: none; }
-        
-        /* Input Bar */
         .input-section { padding: 12px 16px; border-top: 1px solid #e5e5e5; display: flex; gap: 8px; background: #fff; align-items: center; }
         .input-section input { flex: 1; padding: 12px 16px; border: 1px solid #ddd; border-radius: 24px; font-size: 15px; outline: none; background: #fcfcfc; }
         .input-section button { padding: 10px 20px; background: #0084ff; color: white; border: none; border-radius: 20px; cursor: pointer; font-weight: 600; font-size: 15px; height: 42px; }
-        
-        /* Recording Animation state */
         .recording-active { animation: pulse 1.5s infinite; background: #e74c3c !important; color: white !important; }
         @keyframes pulse {
             0% { transform: scale(1); }
             50% { transform: scale(1.1); }
             100% { transform: scale(1); }
         }
-        
         .placeholder { display: flex; align-items: center; justify-content: center; height: 100%; color: #999; font-size: 16px; background: #f9f9f9; }
         .empty-state { padding: 40px 20px; text-align: center; color: #999; font-size: 14px; }
-        
         @media (max-width: 768px) {
             .sidebar { width: 100%; position: absolute; left: 0; top: 0; transform: translateX(0); }
             .main { width: 100%; position: absolute; left: 0; top: 0; transform: translateX(100%); transition: transform 0.3s ease; }
@@ -218,17 +196,20 @@ const html = /* html */ `<!DOCTYPE html>
                 if (contacts.length === 0) {
                     chatList.innerHTML = '<div class="empty-state">No chats yet.<br>Add a contact phone to start!</div>';
                 } else {
-                    chatList.innerHTML = contacts.map(contact => \`
-                        <div class="chat-item \${selectedChat === contact ? 'active' : ''}" onclick="handleSelectChat('\${contact}')">
-                            <div class="avatar" style="background: \${generateColor(contact)};">
-                                \${getInitials(contact)}
+                    chatList.innerHTML = contacts.map(contact => {
+                        const isActive = selectedChat === contact ? 'active' : '';
+                        return \`
+                            <div class="chat-item \${isActive}" onclick="handleSelectChat('\${contact}')">
+                                <div class="avatar" style="background: \${generateColor(contact)};">
+                                    \${getInitials(contact)}
+                                </div>
+                                <div class="chat-info">
+                                    <h3>\${contact}</h3>
+                                    <p>Tap to open messages</p>
+                                </div>
                             </div>
-                            <div class="chat-info">
-                                <h3>\${contact}</h3>
-                                <p>Tap to open messages</p>
-                            </div>
-                        </div>
-                    \`).join('');
+                        \`;
+                    }).join('');
                 }
             }
  
@@ -333,38 +314,26 @@ const html = /* html */ `<!DOCTYPE html>
                 }
             }, 2000); 
         }
-
-        // Voice Recording Implementation
+ 
         async function handleVoiceMessage() {
             const micBtn = document.getElementById('micBtn');
-            
             if (!isRecording) {
                 try {
                     const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
                     mediaRecorder = new MediaRecorder(stream);
                     audioChunks = [];
-                    
-                    mediaRecorder.ondataavailable = event => {
-                        audioChunks.push(event.data);
-                    };
-                    
+                    mediaRecorder.ondataavailable = event => audioChunks.push(event.data);
                     mediaRecorder.onstop = async () => {
                         const audioBlob = new Blob(audioChunks, { type: 'audio/mp3' });
                         const reader = new FileReader();
-                        
                         reader.readAsDataURL(audioBlob); 
                         reader.onloadend = async () => {
                             const base64Audio = reader.result;
                             const res = await sendMessage(currentUser, selectedChat, base64Audio, 'audio');
-                            if (!res.error) {
-                                updateData();
-                            }
+                            if (!res.error) updateData();
                         };
-                        
-                        // Stop all mic hardware tracks to clean up device access
                         stream.getTracks().forEach(track => track.stop());
                     };
-                    
                     mediaRecorder.start();
                     isRecording = true;
                     micBtn.classList.add('recording-active');
@@ -372,7 +341,6 @@ const html = /* html */ `<!DOCTYPE html>
                     alert('Could not open microphone. Check browser settings.');
                 }
             } else {
-                // Clicking the button a second time stops recording and triggers saving/sending
                 mediaRecorder.stop();
                 isRecording = false;
                 micBtn.classList.remove('recording-active');
@@ -384,7 +352,6 @@ const html = /* html */ `<!DOCTYPE html>
             currentUser = saved;
             startSync();
         }
- 
         renderStructure();
     </script>
 </body>
@@ -423,9 +390,7 @@ const server = http.createServer((req, res) => {
                     res.end(JSON.stringify({ error: 'Phone required' }));
                     return;
                 }
-                if (!users[phone]) {
-                    users[phone] = { phone, contacts: [] };
-                }
+                if (!users[phone]) users[phone] = { phone, contacts: [] };
                 res.writeHead(200);
                 res.end(JSON.stringify({ success: true, phone }));
             } catch (e) {
@@ -482,7 +447,6 @@ const server = http.createServer((req, res) => {
                 }
                 const chatId = [sender, receiver].sort().join('_');
                 if (!chats[chatId]) chats[chatId] = [];
-                // Store message with type tracking ('text' or 'audio')
                 chats[chatId].push({ sender, text, type: type || 'text', timestamp: Date.now() });
                 res.writeHead(200);
                 res.end(JSON.stringify({ success: true }));
@@ -510,7 +474,6 @@ const server = http.createServer((req, res) => {
 });
  
 const PORT = process.env.PORT || 3000;
- 
 server.listen(PORT, "0.0.0.0", () => {
     console.log(`Server is running on port ${PORT}`);
 });
