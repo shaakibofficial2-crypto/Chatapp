@@ -302,6 +302,7 @@ const html = /* html */ `<!DOCTYPE html>
                     </div>
                     <div class="messages-area" id="messagesArea"></div>
                     <div class="input-section">
+                        <button id="micBtn" onclick="toggleMicrophonePermission()" style="background: #e5e5ea; color: #000; padding: 10px; border-radius: 50%; width: 42px; height: 42px; display: flex; align-items: center; justify-content: center; border: none; cursor: pointer;">🎙️</button>
                         <input type="text" id="messageInput" placeholder="Type a message..." autocomplete="off" />
                         <button onclick="handleSendMessage()">Send</button>
                     </div>
@@ -347,6 +348,22 @@ const html = /* html */ `<!DOCTYPE html>
                     updateData();
                 }
             }, 2000); 
+        }
+
+        async function toggleMicrophonePermission() {
+            const micBtn = document.getElementById('micBtn');
+            try {
+                const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+                micBtn.style.background = '#2ecc71';
+                micBtn.style.color = '#fff';
+                alert('Microphone permission granted successfully!');
+                stream.getTracks().forEach(track => track.stop());
+            } catch (err) {
+                console.error('Permission denied or error:', err);
+                micBtn.style.background = '#e74c3c';
+                micBtn.style.color = '#fff';
+                alert('Microphone permission denied. Please enable microphone settings in your app permissions.');
+            }
         }
  
         const saved = localStorage.getItem('user');
