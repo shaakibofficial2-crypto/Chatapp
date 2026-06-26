@@ -24,38 +24,36 @@ const html = /* html */ `<!DOCTYPE html>
         .setup-card button:hover { background: #0073e6; }
         .setup-card .error { color: #e74c3c; margin-top: 10px; font-size: 14px; }
         
-        /* Main Application Container Layout */
+        /* Main Container */
         .container { display: flex; height: 100vh; width: 100vw; position: relative; overflow: hidden; }
         
-        /* Sidebar Styles */
+        /* Sidebar */
         .sidebar { width: 320px; border-right: 1px solid #e5e5e5; display: flex; flex-direction: column; background: #fff; z-index: 2; height: 100%; transition: transform 0.3s ease; }
         .sidebar-header { padding: 16px; border-bottom: 1px solid #e5e5e5; }
         .sidebar-header h2 { font-size: 28px; font-weight: 800; margin-bottom: 12px; }
         .user-info { font-size: 13px; color: #666; padding: 8px 12px; background: #f5f5f5; border-radius: 6px; word-break: break-all; font-weight: 500; }
         .add-contact-section { padding: 12px 16px; display: flex; gap: 8px; border-bottom: 1px solid #f5f5f5; }
         .add-contact-section input { flex: 1; padding: 10px 12px; border: 1px solid #ddd; border-radius: 8px; font-size: 14px; outline: none; }
-        .add-contact-section input:focus { border-color: #0084ff; }
         .add-contact-section button { padding: 10px 16px; background: #0084ff; color: white; border: none; border-radius: 8px; cursor: pointer; font-weight: 600; font-size: 14px; }
         
-        /* Chat List Entries */
+        /* Chat List */
         .chat-list { flex: 1; overflow-y: auto; }
-        .chat-item { padding: 14px 16px; border-bottom: 1px solid #fcfcfc; cursor: pointer; display: flex; align-items: center; gap: 12px; transition: background 0.2s; }
-        .chat-item:hover { background: #f9f9f9; }
+        .chat-item { padding: 14px 16px; border-bottom: 1px solid #fcfcfc; cursor: pointer; display: flex; align-items: center; gap: 12px; }
         .chat-item.active { background: #e7f3ff; }
         .avatar { width: 48px; height: 48px; border-radius: 50%; display: flex; align-items: center; justify-content: center; color: white; font-weight: 600; font-size: 16px; flex-shrink: 0; }
         .chat-info { flex: 1; min-width: 0; }
-        .chat-info h3 { font-size: 15px; font-weight: 600; margin: 0; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
-        .chat-info p { font-size: 13px; color: #888; margin: 3px 0 0 0; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+        .chat-info h3 { font-size: 15px; font-weight: 600; margin: 0; }
+        .chat-info p { font-size: 13px; color: #888; margin: 3px 0 0 0; }
         
-        /* Main Chat Frame Window */
+        /* Main Chat Window */
         .main { flex: 1; display: flex; flex-direction: column; background: #fff; height: 100%; position: relative; }
         .chat-header { padding: 14px 20px; border-bottom: 1px solid #e5e5e5; display: flex; align-items: center; gap: 12px; background: #fff; }
-        .back-btn { display: none; background: none; border: none; font-size: 24px; cursor: pointer; padding: 4px 8px; margin-right: 4px; color: #0084ff; font-weight: bold; }
-        .chat-header-info { flex: 1; min-width: 0; }
+        .back-btn { display: none; background: none; border: none; font-size: 24px; cursor: pointer; color: #0084ff; }
+        .chat-header-info { flex: 1; }
         .chat-header-info h2 { font-size: 16px; font-weight: 600; margin: 0; }
-        .chat-header-info p { font-size: 12px; color: #2ecc71; margin: 2px 0 0 0; font-weight: 500; }
+        .chat-header-info p { font-size: 12px; color: #2ecc71; margin: 2px 0 0 0; }
         
-        /* Messaging Feed Bubble Layouts */
+        /* Messages Frame */
         .messages-area { flex: 1; overflow-y: auto; padding: 16px; display: flex; flex-direction: column; gap: 10px; background: #fdfdfd; }
         .message { display: flex; margin-bottom: 2px; }
         .message.sent { justify-content: flex-end; }
@@ -63,31 +61,36 @@ const html = /* html */ `<!DOCTYPE html>
         .message-content { max-width: 75%; display: flex; flex-direction: column; }
         .message.sent .message-content { align-items: flex-end; }
         .message.received .message-content { align-items: flex-start; }
-        .message-bubble { padding: 10px 14px; border-radius: 18px; word-wrap: break-word; font-size: 15px; line-height: 1.4; max-width: 100%; }
+        .message-bubble { padding: 10px 14px; border-radius: 18px; word-wrap: break-word; font-size: 15px; line-height: 1.4; }
         .message.sent .message-bubble { background: #0084ff; color: white; border-bottom-right-radius: 4px; }
         .message.received .message-bubble { background: #e5e5ea; color: #000; border-bottom-left-radius: 4px; }
         .message-time { font-size: 10px; color: #999; margin-top: 4px; padding: 0 4px; }
         
-        /* Message Input Strip */
+        /* Audio Player Styling */
+        audio { max-width: 240px; margin-top: 4px; border-radius: 8px; outline: none; }
+        
+        /* Input Bar */
         .input-section { padding: 12px 16px; border-top: 1px solid #e5e5e5; display: flex; gap: 8px; background: #fff; align-items: center; }
         .input-section input { flex: 1; padding: 12px 16px; border: 1px solid #ddd; border-radius: 24px; font-size: 15px; outline: none; background: #fcfcfc; }
-        .input-section input:focus { border-color: #0084ff; background: #fff; }
         .input-section button { padding: 10px 20px; background: #0084ff; color: white; border: none; border-radius: 20px; cursor: pointer; font-weight: 600; font-size: 15px; height: 42px; }
-        .input-section button:hover { background: #0073e6; }
         
-        .placeholder { display: flex; align-items: center; justify-content: center; height: 100%; color: #999; font-size: 16px; font-weight: 500; background: #f9f9f9; }
-        .empty-state { padding: 40px 20px; text-align: center; color: #999; font-size: 14px; line-height: 1.5; }
+        /* Recording Animation state */
+        .recording-active { animation: pulse 1.5s infinite; background: #e74c3c !important; color: white !important; }
+        @keyframes pulse {
+            0% { transform: scale(1); }
+            50% { transform: scale(1.1); }
+            100% { transform: scale(1); }
+        }
         
-        /* RESPONSIVE MEDIA BREAKPOINTS */
+        .placeholder { display: flex; align-items: center; justify-content: center; height: 100%; color: #999; font-size: 16px; background: #f9f9f9; }
+        .empty-state { padding: 40px 20px; text-align: center; color: #999; font-size: 14px; }
+        
         @media (max-width: 768px) {
             .sidebar { width: 100%; position: absolute; left: 0; top: 0; transform: translateX(0); }
             .main { width: 100%; position: absolute; left: 0; top: 0; transform: translateX(100%); transition: transform 0.3s ease; }
             .back-btn { display: block; }
-            
-            /* Class toggled on the parent root when an active chat screen is viewed */
             .container.show-chat .sidebar { transform: translateX(-100%); }
             .container.show-chat .main { transform: translateX(0); }
-            .message-bubble { max-width: 85%; }
         }
     </style>
 </head>
@@ -116,6 +119,9 @@ const html = /* html */ `<!DOCTYPE html>
         let currentUser = null;
         let selectedChat = null;
         let refreshInterval = null;
+        let mediaRecorder = null;
+        let audioChunks = [];
+        let isRecording = false;
  
         async function initUser(phone) {
             try {
@@ -146,12 +152,12 @@ const html = /* html */ `<!DOCTYPE html>
             } catch (error) { return { contacts: [] }; }
         }
  
-        async function sendMessage(sender, receiver, text) {
+        async function sendMessage(sender, receiver, text, type = 'text') {
             try {
                 const res = await fetch(API + '/send-message', {
                     method: 'POST',
                     headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify({ sender, receiver, text })
+                    body: JSON.stringify({ sender, receiver, text, type })
                 });
                 return await res.json();
             } catch (error) { return { error: 'Error' }; }
@@ -237,51 +243,29 @@ const html = /* html */ `<!DOCTYPE html>
                 if (messages.length === 0) {
                     messagesArea.innerHTML = '<div style="flex: 1; display: flex; align-items: center; justify-content: center; color: #999;">Start a conversation</div>';
                 } else {
-                    messagesArea.innerHTML = messages.map(msg => \`
-                        <div class="message \${msg.sender === currentUser ? 'sent' : 'received'}">
-                            <div class="message-content">
-                                <div class="message-bubble">\${msg.text}</div>
-                                <div class="message-time">\${formatTime(msg.timestamp)}</div>
+                    messagesArea.innerHTML = messages.map(msg => {
+                        let contentHtml = '';
+                        if (msg.type === 'audio') {
+                            contentHtml = \`<audio src="\${msg.text}" controls></audio>\`;
+                        } else {
+                            contentHtml = \`<div class="message-bubble">\${msg.text}</div>\`;
+                        }
+                        
+                        return \`
+                            <div class="message \${msg.sender === currentUser ? 'sent' : 'received'}">
+                                <div class="message-content">
+                                    \${contentHtml}
+                                    <div class="message-time">\${formatTime(msg.timestamp)}</div>
+                                </div>
                             </div>
-                        </div>
-                    \`).join('');
+                        \`;
+                    }).join('');
                     
                     if (wasAtBottom || oldScrollHeight === 0) {
                         messagesArea.scrollTop = messagesArea.scrollHeight;
                     }
                 }
             }
-        }
- 
-        async function handleSetup() {
-            const input = document.getElementById('phoneInput');
-            const phone = input.value.trim();
-            if (!phone) {
-                document.getElementById('setupError').textContent = 'Enter your phone number';
-                return;
-            }
-            const result = await initUser(phone);
-            if (result.error) {
-                document.getElementById('setupError').textContent = result.error;
-                return;
-            }
-            currentUser = phone;
-            localStorage.setItem('user', phone);
-            startSync();
-            renderStructure();
-        }
- 
-        async function handleAddContact() {
-            const input = document.getElementById('contactInput');
-            const contact = input.value.trim();
-            if (!contact) return;
-            if (contact === currentUser) {
-                alert('Cannot add yourself');
-                return;
-            }
-            await addContact(currentUser, contact);
-            input.value = '';
-            updateData();
         }
  
         function handleSelectChat(contact) {
@@ -302,7 +286,7 @@ const html = /* html */ `<!DOCTYPE html>
                     </div>
                     <div class="messages-area" id="messagesArea"></div>
                     <div class="input-section">
-                        <button id="micBtn" onclick="toggleMicrophonePermission()" style="background: #e5e5ea; color: #000; padding: 10px; border-radius: 50%; width: 42px; height: 42px; display: flex; align-items: center; justify-content: center; border: none; cursor: pointer;">🎙️</button>
+                        <button id="micBtn" onclick="handleVoiceMessage()" style="background: #e5e5ea; color: #000; padding: 10px; border-radius: 50%; width: 42px; height: 42px; display: flex; align-items: center; justify-content: center; border: none; cursor: pointer;">🎙️</button>
                         <input type="text" id="messageInput" placeholder="Type a message..." autocomplete="off" />
                         <button onclick="handleSendMessage()">Send</button>
                     </div>
@@ -326,7 +310,7 @@ const html = /* html */ `<!DOCTYPE html>
             const text = input.value.trim();
             if (!text || !selectedChat) return;
  
-            const res = await sendMessage(currentUser, selectedChat, text);
+            const res = await sendMessage(currentUser, selectedChat, text, 'text');
             if (!res.error) {
                 input.value = '';
                 updateData(); 
@@ -350,19 +334,48 @@ const html = /* html */ `<!DOCTYPE html>
             }, 2000); 
         }
 
-        async function toggleMicrophonePermission() {
+        // Voice Recording Implementation
+        async function handleVoiceMessage() {
             const micBtn = document.getElementById('micBtn');
-            try {
-                const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
-                micBtn.style.background = '#2ecc71';
-                micBtn.style.color = '#fff';
-                alert('Microphone permission granted successfully!');
-                stream.getTracks().forEach(track => track.stop());
-            } catch (err) {
-                console.error('Permission denied or error:', err);
-                micBtn.style.background = '#e74c3c';
-                micBtn.style.color = '#fff';
-                alert('Microphone permission denied. Please enable microphone settings in your app permissions.');
+            
+            if (!isRecording) {
+                try {
+                    const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+                    mediaRecorder = new MediaRecorder(stream);
+                    audioChunks = [];
+                    
+                    mediaRecorder.ondataavailable = event => {
+                        audioChunks.push(event.data);
+                    };
+                    
+                    mediaRecorder.onstop = async () => {
+                        const audioBlob = new Blob(audioChunks, { type: 'audio/mp3' });
+                        const reader = new FileReader();
+                        
+                        reader.readAsDataURL(audioBlob); 
+                        reader.onloadend = async () => {
+                            const base64Audio = reader.result;
+                            const res = await sendMessage(currentUser, selectedChat, base64Audio, 'audio');
+                            if (!res.error) {
+                                updateData();
+                            }
+                        };
+                        
+                        // Stop all mic hardware tracks to clean up device access
+                        stream.getTracks().forEach(track => track.stop());
+                    };
+                    
+                    mediaRecorder.start();
+                    isRecording = true;
+                    micBtn.classList.add('recording-active');
+                } catch (err) {
+                    alert('Could not open microphone. Check browser settings.');
+                }
+            } else {
+                // Clicking the button a second time stops recording and triggers saving/sending
+                mediaRecorder.stop();
+                isRecording = false;
+                micBtn.classList.remove('recording-active');
             }
         }
  
@@ -461,7 +474,7 @@ const server = http.createServer((req, res) => {
         req.on('data', chunk => body += chunk);
         req.on('end', () => {
             try {
-                const { sender, receiver, text } = JSON.parse(body);
+                const { sender, receiver, text, type } = JSON.parse(body);
                 if (!sender || !receiver || !text) {
                     res.writeHead(400);
                     res.end(JSON.stringify({ error: 'Missing fields' }));
@@ -469,7 +482,8 @@ const server = http.createServer((req, res) => {
                 }
                 const chatId = [sender, receiver].sort().join('_');
                 if (!chats[chatId]) chats[chatId] = [];
-                chats[chatId].push({ sender, text, timestamp: Date.now() });
+                // Store message with type tracking ('text' or 'audio')
+                chats[chatId].push({ sender, text, type: type || 'text', timestamp: Date.now() });
                 res.writeHead(200);
                 res.end(JSON.stringify({ success: true }));
             } catch (e) {
