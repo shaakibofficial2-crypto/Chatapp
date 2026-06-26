@@ -213,7 +213,7 @@ const html = /* html */ `<!DOCTYPE html>
                     chatList.innerHTML = '<div class="empty-state">No chats yet.<br>Add a contact phone to start!</div>';
                 } else {
                     chatList.innerHTML = contacts.map(contact => \`
-                        <div class="chat-item \${selectedChat === contact ? 'active' : ''}" onclick="handleSelectChat('\' + contact + '\')">
+                        <div class="chat-item \${selectedChat === contact ? 'active' : ''}" onclick="handleSelectChat('\${contact}')">
                             <div class="avatar" style="background: \${generateColor(contact)};">
                                 \${getInitials(contact)}
                             </div>
@@ -309,7 +309,6 @@ const html = /* html */ `<!DOCTYPE html>
                 document.getElementById('messageInput')?.focus();
             }
             
-            // Activate mobile layout screen slide
             document.getElementById('appContainer')?.classList.add('show-chat');
             updateData();
         }
@@ -326,9 +325,13 @@ const html = /* html */ `<!DOCTYPE html>
             const text = input.value.trim();
             if (!text || !selectedChat) return;
  
-            await sendMessage(currentUser, selectedChat, text);
-            input.value = '';
-            updateData();
+            const res = await sendMessage(currentUser, selectedChat, text);
+            if (!res.error) {
+                input.value = '';
+                updateData(); 
+            } else {
+                alert('Message failed to send. Try again!');
+            }
         }
  
         document.addEventListener('keypress', (e) => {
@@ -339,7 +342,11 @@ const html = /* html */ `<!DOCTYPE html>
  
         function startSync() {
             if (refreshInterval) clearInterval(refreshInterval);
-            refreshInterval = setInterval(updateData, 1500);
+            refreshInterval = setInterval(() => {
+                if (currentUser && selectedChat) {
+                    updateData();
+                }
+            }, 2000); 
         }
  
         const saved = localStorage.getItem('user');
