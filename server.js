@@ -156,7 +156,7 @@ const html = /* html */ `<!DOCTYPE html>
                         <div class="setup-card">
                             <h1>Chat</h1>
                             <input type="text" id="phoneInput" placeholder="Enter your phone number" />
-                            <button onclick="handleSetup()">Start</button>
+                            <button onclick="window.handleSetup()">Start</button>
                             <div id="setupError" class="error"></div>
                         </div>
                     </div>
@@ -174,7 +174,7 @@ const html = /* html */ `<!DOCTYPE html>
                         </div>
                         <div class="add-contact-section">
                             <input type="text" id="contactInput" placeholder="Add contact phone" />
-                            <button onclick="handleAddContact()">Add</button>
+                            <button onclick="window.handleAddContact()">Add</button>
                         </div>
                         <div class="chat-list" id="chatList"></div>
                     </div>
@@ -199,7 +199,7 @@ const html = /* html */ `<!DOCTYPE html>
                     chatList.innerHTML = contacts.map(contact => {
                         const isActive = selectedChat === contact ? 'active' : '';
                         return \`
-                            <div class="chat-item \${isActive}" onclick="handleSelectChat('\${contact}')">
+                            <div class="chat-item \${isActive}" onclick="window.handleSelectChat('\${contact}')">
                                 <div class="avatar" style="background: \${generateColor(contact)};">
                                     \${getInitials(contact)}
                                 </div>
@@ -256,7 +256,7 @@ const html = /* html */ `<!DOCTYPE html>
             if (mainArea) {
                 mainArea.innerHTML = \`
                     <div class="chat-header">
-                        <button class="back-btn" onclick="handleBackToSidebar()">←</button>
+                        <button class="back-btn" onclick="window.handleBackToSidebar()">←</button>
                         <div class="avatar" style="background: \${generateColor(selectedChat)};">
                             \${getInitials(selectedChat)}
                         </div>
@@ -267,9 +267,9 @@ const html = /* html */ `<!DOCTYPE html>
                     </div>
                     <div class="messages-area" id="messagesArea"></div>
                     <div class="input-section">
-                        <button id="micBtn" onclick="handleVoiceMessage()" style="background: #e5e5ea; color: #000; padding: 10px; border-radius: 50%; width: 42px; height: 42px; display: flex; align-items: center; justify-content: center; border: none; cursor: pointer;">🎙️</button>
+                        <button id="micBtn" onclick="window.handleVoiceMessage()" style="background: #e5e5ea; color: #000; padding: 10px; border-radius: 50%; width: 42px; height: 42px; display: flex; align-items: center; justify-content: center; border: none; cursor: pointer;">🎙️</button>
                         <input type="text" id="messageInput" placeholder="Type a message..." autocomplete="off" />
-                        <button onclick="handleSendMessage()">Send</button>
+                        <button onclick="window.handleSendMessage()">Send</button>
                     </div>
                 \`;
                 document.getElementById('messageInput')?.focus();
@@ -317,6 +317,13 @@ const html = /* html */ `<!DOCTYPE html>
  
         async function handleVoiceMessage() {
             const micBtn = document.getElementById('micBtn');
+            
+            // Safety check: Make sure the browser actually supports recording
+            if (!navigator.mediaDevices || !navigator.mediaDevices.getUserMedia) {
+                alert('Audio recording is not supported on this browser or requires an HTTPS connection.');
+                return;
+            }
+
             if (!isRecording) {
                 try {
                     const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
@@ -338,7 +345,7 @@ const html = /* html */ `<!DOCTYPE html>
                     isRecording = true;
                     micBtn.classList.add('recording-active');
                 } catch (err) {
-                    alert('Could not open microphone. Check browser settings.');
+                    alert('Could not open microphone. Check browser app permissions.');
                 }
             } else {
                 mediaRecorder.stop();
@@ -347,6 +354,14 @@ const html = /* html */ `<!DOCTYPE html>
             }
         }
  
+        // EXPLICIT GLOBAL BINDINGS - This fixes the "handleSetup is not defined" error!
+        window.handleSetup = handleSetup;
+        window.handleAddContact = handleAddContact;
+        window.handleSelectChat = handleSelectChat;
+        window.handleBackToSidebar = handleBackToSidebar;
+        window.handleSendMessage = handleSendMessage;
+        window.handleVoiceMessage = handleVoiceMessage;
+
         const saved = localStorage.getItem('user');
         if (saved) {
             currentUser = saved;
