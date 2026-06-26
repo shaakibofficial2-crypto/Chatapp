@@ -433,9 +433,10 @@ const server = http.createServer((req, res) => {
  
 // Replace your old port setup with this:
 // 1. Define the port using Render's environment variable, falling back to 3000 locally
+// Define the port using Render's environment variable, falling back to 3000 locally
 const PORT = process.env.PORT || 3000;
 
-// 2. Pass that PORT variable into your listen function
-app.listen(PORT, "0.0.0.0", () => {
+// Pass that PORT variable into your server's listen function
+server.listen(PORT, "0.0.0.0", () => {
     console.log(`Server is running on port ${PORT}`);
 });
