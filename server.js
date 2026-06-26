@@ -78,30 +78,30 @@ const html = /* html */ `<!DOCTYPE html>
     <script>
         const API = 'https://chatapp-hltm.onrender.com/api';
  
-        function generateColor(str) {
+        window.generateColor = function(str) {
             const colors = ['#FF6B6B', '#4ECDC4', '#45B7D1', '#FFA07A', '#98D8C8', '#F7DC6F', '#BB8FCE', '#85C1E2'];
             let hash = 0;
             for (let i = 0; i < str.length; i++) { hash = str.charCodeAt(i) + ((hash << 5) - hash); }
             return colors[Math.abs(hash) % colors.length];
         }
  
-        function getInitials(name) {
+        window.getInitials = function(name) {
             return name.split(' ').map(n => n[0]).join('').toUpperCase().slice(0, 2) || 'U';
         }
  
-        function formatTime(timestamp) {
+        window.formatTime = function(timestamp) {
             const date = new Date(timestamp);
             return date.getHours().toString().padStart(2, '0') + ':' + date.getMinutes().toString().padStart(2, '0');
         }
  
-        let currentUser = null;
-        let selectedChat = null;
+        window.currentUser = null;
+        window.selectedChat = null;
         let refreshInterval = null;
         let mediaRecorder = null;
         let audioChunks = [];
         let isRecording = false;
  
-        async function initUser(phone) {
+        window.initUser = async function(phone) {
             try {
                 const res = await fetch(API + '/init-user', {
                     method: 'POST',
@@ -112,7 +112,7 @@ const html = /* html */ `<!DOCTYPE html>
             } catch (error) { return { error: 'Cannot connect to server' }; }
         }
  
-        async function addContact(phone, contact) {
+        window.addContact = async function(phone, contact) {
             try {
                 const res = await fetch(API + '/add-contact', {
                     method: 'POST',
@@ -123,14 +123,14 @@ const html = /* html */ `<!DOCTYPE html>
             } catch (error) { return { error: 'Error' }; }
         }
  
-        async function getContacts(phone) {
+        window.getContacts = async function(phone) {
             try {
                 const res = await fetch(API + '/contacts/' + phone);
                 return await res.json();
             } catch (error) { return { contacts: [] }; }
         }
  
-        async function sendMessage(sender, receiver, text, type = 'text') {
+        window.sendMessage = async function(sender, receiver, text, type = 'text') {
             try {
                 const res = await fetch(API + '/send-message', {
                     method: 'POST',
@@ -141,16 +141,16 @@ const html = /* html */ `<!DOCTYPE html>
             } catch (error) { return { error: 'Error' }; }
         }
  
-        async function getMessages(user1, user2) {
+        window.getMessages = async function(user1, user2) {
             try {
                 const res = await fetch(API + '/messages/' + user1 + '/' + user2);
                 return await res.json();
             } catch (error) { return { messages: [] }; }
         }
  
-        function renderStructure() {
+        window.renderStructure = function() {
             const app = document.getElementById('app');
-            if (!currentUser) {
+            if (!window.currentUser) {
                 app.innerHTML = \`
                     <div class="setup-screen">
                         <div class="setup-card">
@@ -170,7 +170,7 @@ const html = /* html */ `<!DOCTYPE html>
                     <div class="sidebar">
                         <div class="sidebar-header">
                             <h2>Chats</h2>
-                            <div class="user-info">📱 \${currentUser}</div>
+                            <div class="user-info">📱 \${window.currentUser}</div>
                         </div>
                         <div class="add-contact-section">
                             <input type="text" id="contactInput" placeholder="Add contact phone" />
@@ -183,25 +183,25 @@ const html = /* html */ `<!DOCTYPE html>
                     </div>
                 </div>
             \`;
-            updateData();
+            window.updateData();
         }
  
-        async function updateData() {
-            if (!currentUser) return;
+        window.updateData = async function() {
+            if (!window.currentUser) return;
  
             const chatList = document.getElementById('chatList');
             if (chatList) {
-                const contactsData = await getContacts(currentUser);
+                const contactsData = await window.getContacts(window.currentUser);
                 const contacts = contactsData.contacts || [];
                 if (contacts.length === 0) {
                     chatList.innerHTML = '<div class="empty-state">No chats yet.<br>Add a contact phone to start!</div>';
                 } else {
                     chatList.innerHTML = contacts.map(contact => {
-                        const isActive = selectedChat === contact ? 'active' : '';
+                        const isActive = window.selectedChat === contact ? 'active' : '';
                         return \`
                             <div class="chat-item \${isActive}" onclick="window.handleSelectChat('\${contact}')">
-                                <div class="avatar" style="background: \${generateColor(contact)};">
-                                    \${getInitials(contact)}
+                                <div class="avatar" style="background: \${window.generateColor(contact)};">
+                                    \${window.getInitials(contact)}
                                 </div>
                                 <div class="chat-info">
                                     <h3>\${contact}</h3>
@@ -214,8 +214,8 @@ const html = /* html */ `<!DOCTYPE html>
             }
  
             const messagesArea = document.getElementById('messagesArea');
-            if (selectedChat && messagesArea) {
-                const messagesData = await getMessages(currentUser, selectedChat);
+            if (window.selectedChat && messagesArea) {
+                const messagesData = await window.getMessages(window.currentUser, window.selectedChat);
                 const messages = messagesData.messages || [];
                 
                 const oldScrollHeight = messagesArea.scrollHeight;
@@ -233,10 +233,10 @@ const html = /* html */ `<!DOCTYPE html>
                         }
                         
                         return \`
-                            <div class="message \${msg.sender === currentUser ? 'sent' : 'received'}">
+                            <div class="message \${msg.sender === window.currentUser ? 'sent' : 'received'}">
                                 <div class="message-content">
                                     \${contentHtml}
-                                    <div class="message-time">\${formatTime(msg.timestamp)}</div>
+                                    <div class="message-time">\${window.formatTime(msg.timestamp)}</div>
                                 </div>
                             </div>
                         \`;
@@ -249,19 +249,19 @@ const html = /* html */ `<!DOCTYPE html>
             }
         }
  
-        function handleSelectChat(contact) {
-            selectedChat = contact;
+        window.handleSelectChat = function(contact) {
+            window.selectedChat = contact;
             
             const mainArea = document.getElementById('mainArea');
             if (mainArea) {
                 mainArea.innerHTML = \`
                     <div class="chat-header">
                         <button class="back-btn" onclick="window.handleBackToSidebar()">←</button>
-                        <div class="avatar" style="background: \${generateColor(selectedChat)};">
-                            \${getInitials(selectedChat)}
+                        <div class="avatar" style="background: \${window.generateColor(window.selectedChat)};">
+                            \${window.getInitials(window.selectedChat)}
                         </div>
                         <div class="chat-header-info">
-                            <h2>\${selectedChat}</h2>
+                            <h2>\${window.selectedChat}</h2>
                             <p>Online</p>
                         </div>
                     </div>
@@ -276,25 +276,25 @@ const html = /* html */ `<!DOCTYPE html>
             }
             
             document.getElementById('appContainer')?.classList.add('show-chat');
-            updateData();
+            window.updateData();
         }
         
-        function handleBackToSidebar() {
-            selectedChat = null;
+        window.handleBackToSidebar = function() {
+            window.selectedChat = null;
             document.getElementById('appContainer')?.classList.remove('show-chat');
-            updateData();
+            window.updateData();
         }
  
-        async function handleSendMessage() {
+        window.handleSendMessage = async function() {
             const input = document.getElementById('messageInput');
             if (!input) return;
             const text = input.value.trim();
-            if (!text || !selectedChat) return;
+            if (!text || !window.selectedChat) return;
  
-            const res = await sendMessage(currentUser, selectedChat, text, 'text');
+            const res = await window.sendMessage(window.currentUser, window.selectedChat, text, 'text');
             if (!res.error) {
                 input.value = '';
-                updateData(); 
+                window.updateData(); 
             } else {
                 alert('Message failed to send. Try again!');
             }
@@ -302,23 +302,22 @@ const html = /* html */ `<!DOCTYPE html>
  
         document.addEventListener('keypress', (e) => {
             if (e.key === 'Enter' && e.target.id === 'messageInput') {
-                handleSendMessage();
+                window.handleSendMessage();
             }
         });
  
-        function startSync() {
+        window.startSync = function() {
             if (refreshInterval) clearInterval(refreshInterval);
             refreshInterval = setInterval(() => {
-                if (currentUser && selectedChat) {
-                    updateData();
+                if (window.currentUser && window.selectedChat) {
+                    window.updateData();
                 }
             }, 2000); 
         }
  
-        async function handleVoiceMessage() {
+        window.handleVoiceMessage = async function() {
             const micBtn = document.getElementById('micBtn');
             
-            // Safety check: Make sure the browser actually supports recording
             if (!navigator.mediaDevices || !navigator.mediaDevices.getUserMedia) {
                 alert('Audio recording is not supported on this browser or requires an HTTPS connection.');
                 return;
@@ -336,8 +335,8 @@ const html = /* html */ `<!DOCTYPE html>
                         reader.readAsDataURL(audioBlob); 
                         reader.onloadend = async () => {
                             const base64Audio = reader.result;
-                            const res = await sendMessage(currentUser, selectedChat, base64Audio, 'audio');
-                            if (!res.error) updateData();
+                            const res = await window.sendMessage(window.currentUser, window.selectedChat, base64Audio, 'audio');
+                            if (!res.error) window.updateData();
                         };
                         stream.getTracks().forEach(track => track.stop());
                     };
@@ -354,20 +353,43 @@ const html = /* html */ `<!DOCTYPE html>
             }
         }
  
-        // EXPLICIT GLOBAL BINDINGS - This fixes the "handleSetup is not defined" error!
-        window.handleSetup = handleSetup;
-        window.handleAddContact = handleAddContact;
-        window.handleSelectChat = handleSelectChat;
-        window.handleBackToSidebar = handleBackToSidebar;
-        window.handleSendMessage = handleSendMessage;
-        window.handleVoiceMessage = handleVoiceMessage;
+        window.handleSetup = async function() {
+            const input = document.getElementById('phoneInput');
+            const phone = input.value.trim();
+            if (!phone) {
+                document.getElementById('setupError').textContent = 'Enter your phone number';
+                return;
+            }
+            const result = await window.initUser(phone);
+            if (result.error) {
+                document.getElementById('setupError').textContent = result.error;
+                return;
+            }
+            window.currentUser = phone;
+            localStorage.setItem('user', phone);
+            window.startSync();
+            window.renderStructure();
+        }
+
+        window.handleAddContact = async function() {
+            const input = document.getElementById('contactInput');
+            const contact = input.value.trim();
+            if (!contact) return;
+            if (contact === window.currentUser) {
+                alert('Cannot add yourself');
+                return;
+            }
+            await window.addContact(window.currentUser, contact);
+            input.value = '';
+            window.updateData();
+        }
 
         const saved = localStorage.getItem('user');
         if (saved) {
-            currentUser = saved;
-            startSync();
+            window.currentUser = saved;
+            window.startSync();
         }
-        renderStructure();
+        window.renderStructure();
     </script>
 </body>
 </html>`;
@@ -379,7 +401,12 @@ const server = http.createServer((req, res) => {
     res.setHeader('Access-Control-Allow-Origin', '*');
     res.setHeader('Access-Control-Allow-Methods', 'GET, POST, OPTIONS');
     res.setHeader('Access-Control-Allow-Headers', 'Content-Type');
-    res.setHeader('Content-Type', 'application/json');
+    
+    // ANTI-CACHING HEADERS ADDED HERE!
+    res.setHeader('Cache-Control', 'no-store, no-cache, must-revalidate, proxy-revalidate');
+    res.setHeader('Pragma', 'no-cache');
+    res.setHeader('Expires', '0');
+    res.setHeader('Surrogate-Control', 'no-store');
  
     if (req.method === 'OPTIONS') {
         res.writeHead(200);
