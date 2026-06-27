@@ -1,8 +1,7 @@
 const http = require('http');
 const url = require('url');
-const { MongoClient } = require('mongodb'); // 1. Import MongoDB Driver
+const { MongoClient } = require('mongodb'); 
 
-// 2. Connect using the Environment variable we just saved on Render!
 const mongoUri = process.env.MONGO_URI;
 if (!mongoUri) {
     console.error("❌ ERROR: MONGO_URI environment variable is missing!");
@@ -15,7 +14,7 @@ let db, usersCollection, chatsCollection;
 async function connectDB() {
     try {
         await client.connect();
-        db = client.db('chat-app-db'); // This creates your database automatically
+        db = client.db('chat-app-db'); 
         usersCollection = db.collection('users');
         chatsCollection = db.collection('chats');
         console.log("✅ Successfully connected to MongoDB Atlas Cloud!");
@@ -25,8 +24,7 @@ async function connectDB() {
     }
 }
 
-// Start database connection
-connectDB();
+// NOTE: We removed the standalone connectDB() call from here so it runs inside our wrapper down below.
  
 const html = /* html */ `<!DOCTYPE html>
 <html lang="en">
@@ -444,7 +442,6 @@ const server = http.createServer((req, res) => {
         return;
     }
  
-    // 3. API Changes to look into MongoDB Atlas Cloud Database
     if (pathname === '/api/init-user' && req.method === 'POST') {
         let body = '';
         req.on('data', chunk => body += chunk);
@@ -484,7 +481,6 @@ const server = http.createServer((req, res) => {
                     return;
                 }
                 
-                // Add contact if it doesn't exist yet inside array
                 await usersCollection.updateOne(
                     { phone: phone },
                     { $addToSet: { contacts: contact } },
@@ -561,7 +557,15 @@ const server = http.createServer((req, res) => {
     res.end(JSON.stringify({ error: 'Not found' }));
 });
  
+// 🛠️ WRAPPED BOOT ORDER HERE: Forces server to wait for MongoDB variables to populate first!
 const PORT = process.env.PORT || 3000;
-server.listen(PORT, "0.0.0.0", () => {
-    console.log(`Server is running on port ${PORT}`);
-});
+
+async function startServer() {
+    await connectDB(); // Establish Atlas link first
+    
+    server.listen(PORT, "0.0.0.0", () => {
+        console.log(`Server is running on port ${PORT}`);
+    });
+}
+
+startServer();
