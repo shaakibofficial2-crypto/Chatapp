@@ -1,15 +1,15 @@
 const http = require('http');
 const url = require('url');
 const { MongoClient } = require('mongodb'); 
-
-
-
+ 
+ 
+ 
 const mongoUri = process.env.MONGO_URI;
 if (!mongoUri) {
     console.error("❌ ERROR: MONGO_URI environment variable is missing!");
     process.exit(1);
 }
-
+ 
 // Optimized connection configurations to prevent connection drops
 const client = new MongoClient(mongoUri, {
     maxPoolSize: 10,
@@ -18,9 +18,9 @@ const client = new MongoClient(mongoUri, {
     connectTimeoutMS: 10000,
     socketTimeoutMS: 45000
 });
-
+ 
 let db, usersCollection, chatsCollection;
-
+ 
 async function connectDB() {
     try {
         await client.connect();
@@ -43,6 +43,12 @@ const html = /* html */ `<!DOCTYPE html>
     <style>
         * { margin: 0; padding: 0; box-sizing: border-box; }
         body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; background: #fff; color: #222; overflow: hidden; }
+        .debug-popup { position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.5); display: flex; align-items: center; justify-content: center; z-index: 9999; }
+        .debug-box { background: white; padding: 20px; border-radius: 12px; max-width: 90%; max-height: 80%; overflow-y: auto; box-shadow: 0 10px 40px rgba(0,0,0,0.3); }
+        .debug-box h2 { color: #e74c3c; margin-bottom: 10px; font-size: 18px; }
+        .debug-box h3 { margin-bottom: 10px; font-size: 16px; }
+        .debug-box p { font-size: 14px; line-height: 1.6; margin-bottom: 10px; color: #333; word-break: break-all; }
+        .debug-box button { background: #0084ff; color: white; border: none; padding: 10px 20px; border-radius: 6px; cursor: pointer; font-weight: 600; margin-top: 15px; width: 100%; }
         .setup-screen { display: flex; align-items: center; justify-content: center; height: 100vh; padding: 20px; background: #f9f9f9; }
         .setup-card { width: 100%; max-width: 400px; background: #fff; padding: 40px 20px; text-align: center; border-radius: 12px; box-shadow: 0 4px 15px rgba(0,0,0,0.08); }
         .setup-card h1 { font-size: 28px; margin-bottom: 30px; color: #000; font-weight: 600; }
@@ -106,6 +112,39 @@ const html = /* html */ `<!DOCTYPE html>
     <div id="app"></div>
  
     <script>
+        // DEBUG POPUP FUNCTION
+        window.showDebug = function(title, message, isError = false) {
+            const popup = document.createElement('div');
+            popup.className = 'debug-popup';
+            popup.innerHTML = \`
+                <div class="debug-box">
+                    <h2>\${isError ? '⚠️ ERROR' : 'ℹ️ INFO'}</h2>
+                    <h3>\${title}</h3>
+                    <p>\${message}</p>
+                    <button onclick="this.parentElement.parentElement.remove()">OK</button>
+                </div>
+            \`;
+            document.body.appendChild(popup);
+        };
+ 
+        // TEST CONNECTION FUNCTION
+        window.testConnection = async function() {
+            const apiUrl = window.location.origin + '/api';
+            try {
+                const res = await fetch(apiUrl + '/contacts/test', { method: 'GET' });
+                if (res.ok || res.status === 500) {
+                    window.showDebug('✅ Server Connected', 'Backend is reachable!', false);
+                    return true;
+                } else {
+                    window.showDebug('⚠️ Server Error', \`Status: \${res.status}\`, true);
+                    return false;
+                }
+            } catch (error) {
+                window.showDebug('❌ Connection Failed', \`Cannot reach server: \${error.message}\`, true);
+                return false;
+            }
+        };
+ 
         const API = window.location.origin + '/api';
  
         window.generateColor = function(str) {
@@ -138,8 +177,15 @@ const html = /* html */ `<!DOCTYPE html>
                     headers: { 'Content-Type': 'application/json' },
                     body: JSON.stringify({ phone })
                 });
-                return await res.json();
-            } catch (error) { return { error: 'Cannot connect to server' }; }
+                const data = await res.json();
+                if (data.error) {
+                    window.showDebug('❌ Init Failed', data.error, true);
+                }
+                return data;
+            } catch (error) { 
+                window.showDebug('❌ Connection Error', \`Cannot reach server: \${error.message}\`, true);
+                return { error: 'Cannot connect to server' }; 
+            }
         }
  
         window.addContact = async function(phone, contact) {
@@ -150,14 +196,19 @@ const html = /* html */ `<!DOCTYPE html>
                     body: JSON.stringify({ phone, contact })
                 });
                 return await res.json();
-            } catch (error) { return { error: 'Error' }; }
+            } catch (error) { 
+                window.showDebug('❌ Error', \`Failed to add contact: \${error.message}\`, true);
+                return { error: 'Error' }; 
+            }
         }
  
         window.getContacts = async function(phone) {
             try {
                 const res = await fetch(API + '/contacts/' + phone);
                 return await res.json();
-            } catch (error) { return { contacts: [] }; }
+            } catch (error) { 
+                return { contacts: [] }; 
+            }
         }
  
         window.sendMessage = async function(sender, receiver, text, type = 'text') {
@@ -168,7 +219,10 @@ const html = /* html */ `<!DOCTYPE html>
                     body: JSON.stringify({ sender, receiver, text, type })
                 });
                 return await res.json();
-            } catch (error) { return { error: 'Error' }; }
+            } catch (error) { 
+                window.showDebug('❌ Send Failed', \`Error: \${error.message}\`, true);
+                return { error: 'Error' }; 
+            }
         }
  
         window.getMessages = async function(user1, user2) {
@@ -187,6 +241,7 @@ const html = /* html */ `<!DOCTYPE html>
                             <h1>Chat</h1>
                             <input type="text" id="phoneInput" placeholder="Enter your phone number" />
                             <button onclick="window.handleSetup()">Start</button>
+                            <button onclick="window.testConnection()" style="margin-top: 10px; background: #95a5a6;">Test Connection</button>
                             <div id="setupError" class="error"></div>
                         </div>
                     </div>
@@ -216,7 +271,6 @@ const html = /* html */ `<!DOCTYPE html>
             window.updateData();
         }
  
-        // 🛠️ Telegram Update: Groups chat history under custom date headers dynamically
         window.updateData = async function() {
             if (!window.currentUser) return;
  
@@ -257,7 +311,7 @@ const html = /* html */ `<!DOCTYPE html>
                 } else {
                     let messagesHtml = '';
                     let lastDateStr = '';
-
+ 
                     messages.forEach(msg => {
                         const msgDate = new Date(msg.timestamp);
                         const currentDateStr = msgDate.toLocaleDateString('en-US', { 
@@ -265,8 +319,7 @@ const html = /* html */ `<!DOCTYPE html>
                             day: 'numeric', 
                             year: 'numeric' 
                         });
-
-                        // Inject dynamic centered Telegram-style date headers
+ 
                         if (currentDateStr !== lastDateStr) {
                             messagesHtml += \`
                                 <div style="text-align: center; margin: 15px 0; font-size: 11px; color: #7a8186; font-weight: 600; user-select: none;">
@@ -275,7 +328,7 @@ const html = /* html */ `<!DOCTYPE html>
                             \`;
                             lastDateStr = currentDateStr;
                         }
-
+ 
                         let contentHtml = '';
                         if (msg.type === 'audio') {
                             contentHtml = \`<audio src="\${msg.text}" controls></audio>\`;
@@ -349,7 +402,7 @@ const html = /* html */ `<!DOCTYPE html>
                 input.value = '';
                 window.updateData(); 
             } else {
-                alert('Message failed to send. Try again!');
+                window.showDebug('❌ Send Failed', res.error, true);
             }
         }
  
@@ -372,7 +425,7 @@ const html = /* html */ `<!DOCTYPE html>
             const micBtn = document.getElementById('micBtn');
             
             if (!navigator.mediaDevices || !navigator.mediaDevices.getUserMedia) {
-                alert('Audio recording is not supported on this browser or requires an HTTPS connection.');
+                window.showDebug('❌ Microphone Not Supported', 'Audio recording requires HTTPS connection.', true);
                 return;
             }
  
@@ -397,7 +450,7 @@ const html = /* html */ `<!DOCTYPE html>
                     isRecording = true;
                     micBtn.classList.add('recording-active');
                 } catch (err) {
-                    alert('Could not open microphone. Check browser app permissions.');
+                    window.showDebug('❌ Microphone Error', \`Check permissions: \${err.message}\`, true);
                 }
             } else {
                 mediaRecorder.stop();
@@ -420,6 +473,7 @@ const html = /* html */ `<!DOCTYPE html>
             }
             window.currentUser = phone;
             localStorage.setItem('user', phone);
+            window.showDebug('✅ Welcome!', \`Logged in as \${phone}\`, false);
             window.startSync();
             window.renderStructure();
         }
@@ -429,7 +483,7 @@ const html = /* html */ `<!DOCTYPE html>
             const contact = input.value.trim();
             if (!contact) return;
             if (contact === window.currentUser) {
-                alert('Cannot add yourself');
+                window.showDebug('❌ Cannot Add', 'You cannot add yourself as a contact', true);
                 return;
             }
             await window.addContact(window.currentUser, contact);
@@ -624,7 +678,7 @@ const server = http.createServer((req, res) => {
 });
  
 const PORT = process.env.PORT || 3000;
-
+ 
 async function startServer() {
     await connectDB(); 
     
@@ -632,6 +686,6 @@ async function startServer() {
         console.log(`Server is running on port ${PORT}`);
     });
 }
-
+ 
 startServer();
-// force change fix v3git add .
+ 
