@@ -1,19 +1,410 @@
 <!DOCTYPE html>
-<html>
+<html lang="en">
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Chat App</title>
+    <style>
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; background: #fff; color: #222; overflow: hidden; }
+        .setup-screen { display: flex; align-items: center; justify-content: center; height: 100vh; padding: 20px; background: #f9f9f9; }
+        .setup-card { width: 100%; max-width: 400px; background: #fff; padding: 40px 20px; text-align: center; border-radius: 12px; box-shadow: 0 4px 15px rgba(0,0,0,0.08); }
+        .setup-card h1 { font-size: 28px; margin-bottom: 30px; color: #000; font-weight: 600; }
+        .setup-card input { width: 100%; padding: 12px 16px; margin-bottom: 15px; border: 1px solid #ddd; border-radius: 8px; font-size: 16px; outline: none; }
+        .setup-card button { width: 100%; padding: 12px; background: #0084ff; color: white; border: none; border-radius: 8px; font-size: 16px; cursor: pointer; font-weight: 600; }
+        .setup-card .error { color: #e74c3c; margin-top: 10px; font-size: 14px; }
+        .container { display: flex; height: 100vh; width: 100vw; position: relative; overflow: hidden; }
+        .sidebar { width: 320px; border-right: 1px solid #e5e5e5; display: flex; flex-direction: column; background: #fff; z-index: 2; height: 100%; transition: transform 0.3s ease; }
+        .sidebar-header { padding: 16px; border-bottom: 1px solid #e5e5e5; }
+        .sidebar-header h2 { font-size: 28px; font-weight: 800; margin-bottom: 12px; }
+        .user-info { font-size: 13px; color: #666; padding: 8px 12px; background: #f5f5f5; border-radius: 6px; word-break: break-all; font-weight: 500; }
+        .add-contact-section { padding: 12px 16px; display: flex; gap: 8px; border-bottom: 1px solid #f5f5f5; }
+        .add-contact-section input { flex: 1; padding: 10px 12px; border: 1px solid #ddd; border-radius: 8px; font-size: 14px; outline: none; }
+        .add-contact-section button { padding: 10px 16px; background: #0084ff; color: white; border: none; border-radius: 8px; cursor: pointer; font-weight: 600; font-size: 14px; }
+        .chat-list { flex: 1; overflow-y: auto; }
+        .chat-item { padding: 14px 16px; border-bottom: 1px solid #fcfcfc; cursor: pointer; display: flex; align-items: center; gap: 12px; }
+        .chat-item.active { background: #e7f3ff; }
+        .avatar { width: 48px; height: 48px; border-radius: 50%; display: flex; align-items: center; justify-content: center; color: white; font-weight: 600; font-size: 16px; flex-shrink: 0; }
+        .chat-info { flex: 1; min-width: 0; }
+        .chat-info h3 { font-size: 15px; font-weight: 600; margin: 0; }
+        .chat-info p { font-size: 13px; color: #888; margin: 3px 0 0 0; }
+        .main { flex: 1; display: flex; flex-direction: column; background: #fff; height: 100%; position: relative; }
+        .chat-header { padding: 14px 20px; border-bottom: 1px solid #e5e5e5; display: flex; align-items: center; gap: 12px; background: #fff; }
+        .back-btn { display: none; background: none; border: none; font-size: 24px; cursor: pointer; color: #0084ff; }
+        .chat-header-info { flex: 1; }
+        .chat-header-info h2 { font-size: 16px; font-weight: 600; margin: 0; }
+        .chat-header-info p { font-size: 12px; color: #2ecc71; margin: 2px 0 0 0; }
+        .messages-area { flex: 1; overflow-y: auto; padding: 16px; display: flex; flex-direction: column; gap: 10px; background: #fdfdfd; }
+        .message { display: flex; margin-bottom: 2px; }
+        .message.sent { justify-content: flex-end; }
+        .message.received { justify-content: flex-start; }
+        .message-content { max-width: 75%; display: flex; flex-direction: column; }
+        .message.sent .message-content { align-items: flex-end; }
+        .message.received .message-content { align-items: flex-start; }
+        .message-bubble { padding: 10px 14px; border-radius: 18px; word-wrap: break-word; font-size: 15px; line-height: 1.4; }
+        .message.sent .message-bubble { background: #0084ff; color: white; border-bottom-right-radius: 4px; }
+        .message.received .message-bubble { background: #e5e5ea; color: #000; border-bottom-left-radius: 4px; }
+        .message-time { font-size: 10px; color: #999; margin-top: 4px; padding: 0 4px; }
+        audio { max-width: 240px; margin-top: 4px; border-radius: 8px; outline: none; }
+        .input-section { padding: 12px 16px; border-top: 1px solid #e5e5e5; display: flex; gap: 8px; background: #fff; align-items: center; }
+        .input-section input { flex: 1; padding: 12px 16px; border: 1px solid #ddd; border-radius: 24px; font-size: 15px; outline: none; background: #fcfcfc; }
+        .input-section button { padding: 10px 20px; background: #0084ff; color: white; border: none; border-radius: 20px; cursor: pointer; font-weight: 600; font-size: 15px; height: 42px; }
+        .recording-active { animation: pulse 1.5s infinite; background: #e74c3c !important; color: white !important; }
+        @keyframes pulse {
+            0% { transform: scale(1); }
+            50% { transform: scale(1.1); }
+            100% { transform: scale(1); }
+        }
+        .placeholder { display: flex; align-items: center; justify-content: center; height: 100%; color: #999; font-size: 16px; background: #f9f9f9; }
+        .empty-state { padding: 40px 20px; text-align: center; color: #999; font-size: 14px; }
+        @media (max-width: 768px) {
+            .sidebar { width: 100%; position: absolute; left: 0; top: 0; transform: translateX(0); }
+            .main { width: 100%; position: absolute; left: 0; top: 0; transform: translateX(100%); transition: transform 0.3s ease; }
+            .back-btn { display: block; }
+            .container.show-chat .sidebar { transform: translateX(-100%); }
+            .container.show-chat .main { transform: translateX(0); }
+        }
+    </style>
 </head>
 <body>
     <div id="app"></div>
+ 
     <script>
-        // Point to your backend server URL (replace with your Render/deployed URL)
-        const API = 'https://your-app.onrender.com/api';
-        window.isCapacitor = true;
+        const API = 'https://chatapp-hltm.onrender.com/api';
+ 
+        window.generateColor = function(str) {
+            const colors = ['#FF6B6B', '#4ECDC4', '#45B7D1', '#FFA07A', '#98D8C8', '#F7DC6F', '#BB8FCE', '#85C1E2'];
+            let hash = 0;
+            for (let i = 0; i < str.length; i++) { hash = str.charCodeAt(i) + ((hash << 5) - hash); }
+            return colors[Math.abs(hash) % colors.length];
+        }
+ 
+        window.getInitials = function(name) {
+            return name.split(' ').map(n => n[0]).join('').toUpperCase().slice(0, 2) || 'U';
+        }
+ 
+        window.formatTime = function(timestamp) {
+            const date = new Date(timestamp);
+            return date.getHours().toString().padStart(2, '0') + ':' + date.getMinutes().toString().padStart(2, '0');
+        }
+ 
+        window.currentUser = null;
+        window.selectedChat = null;
+        let refreshInterval = null;
+        let mediaRecorder = null;
+        let audioChunks = [];
+        let isRecording = false;
+ 
+        window.initUser = async function(phone) {
+            try {
+                const res = await fetch(API + '/init-user', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ phone })
+                });
+                return await res.json();
+            } catch (error) { return { error: 'Cannot connect to server' }; }
+        }
+ 
+        window.addContact = async function(phone, contact) {
+            try {
+                const res = await fetch(API + '/add-contact', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ phone, contact })
+                });
+                return await res.json();
+            } catch (error) { return { error: 'Error' }; }
+        }
+ 
+        window.getContacts = async function(phone) {
+            try {
+                const res = await fetch(API + '/contacts/' + phone);
+                return await res.json();
+            } catch (error) { return { contacts: [] }; }
+        }
+ 
+        window.sendMessage = async function(sender, receiver, text, type = 'text') {
+            try {
+                const res = await fetch(API + '/send-message', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ sender, receiver, text, type })
+                });
+                return await res.json();
+            } catch (error) { return { error: 'Error' }; }
+        }
+ 
+        window.getMessages = async function(user1, user2) {
+            try {
+                const res = await fetch(API + '/messages/' + user1 + '/' + user2);
+                return await res.json();
+            } catch (error) { return { messages: [] }; }
+        }
+ 
+        window.renderStructure = function() {
+            const app = document.getElementById('app');
+            if (!window.currentUser) {
+                app.innerHTML = `
+                    <div class="setup-screen">
+                        <div class="setup-card">
+                            <h1>Chat</h1>
+                            <input type="text" id="phoneInput" placeholder="Enter your phone number" />
+                            <button onclick="window.handleSetup()">Start</button>
+                            <div id="setupError" class="error"></div>
+                        </div>
+                    </div>
+                `;
+                setTimeout(() => document.getElementById('phoneInput')?.focus(), 100);
+                return;
+            }
+ 
+            app.innerHTML = `
+                <div class="container" id="appContainer">
+                    <div class="sidebar">
+                        <div class="sidebar-header">
+                            <h2>Chats</h2>
+                            <div class="user-info">📱 ${window.currentUser}</div>
+                        </div>
+                        <div class="add-contact-section">
+                            <input type="text" id="contactInput" placeholder="Add contact phone" />
+                            <button onclick="window.handleAddContact()">Add</button>
+                        </div>
+                        <div class="chat-list" id="chatList"></div>
+                    </div>
+                    <div class="main" id="mainArea">
+                        <div class="placeholder">Select a chat to start messaging</div>
+                    </div>
+                </div>
+            `;
+            window.updateData();
+        }
+ 
+        window.updateData = async function() {
+            if (!window.currentUser) return;
+ 
+            const chatList = document.getElementById('chatList');
+            if (chatList) {
+                const contactsData = await window.getContacts(window.currentUser);
+                const contacts = contactsData.contacts || [];
+                if (contacts.length === 0) {
+                    chatList.innerHTML = '<div class="empty-state">No chats yet.<br>Add a contact phone to start!</div>';
+                } else {
+                    chatList.innerHTML = contacts.map(contact => {
+                        const isActive = window.selectedChat === contact ? 'active' : '';
+                        return `
+                            <div class="chat-item ${isActive}" onclick="window.handleSelectChat('${contact}')">
+                                <div class="avatar" style="background: ${window.generateColor(contact)};">
+                                    ${window.getInitials(contact)}
+                                </div>
+                                <div class="chat-info">
+                                    <h3>${contact}</h3>
+                                    <p>Tap to open messages</p>
+                                </div>
+                            </div>
+                        `;
+                    }).join('');
+                }
+            }
+ 
+            const messagesArea = document.getElementById('messagesArea');
+            if (window.selectedChat && messagesArea) {
+                const messagesData = await window.getMessages(window.currentUser, window.selectedChat);
+                const messages = messagesData.messages || [];
+                
+                const oldScrollHeight = messagesArea.scrollHeight;
+                const wasAtBottom = messagesArea.scrollTop + messagesArea.clientHeight >= oldScrollHeight - 20;
+ 
+                if (messages.length === 0) {
+                    messagesArea.innerHTML = '<div style="flex: 1; display: flex; align-items: center; justify-content: center; color: #999;">Start a conversation</div>';
+                } else {
+                    let messagesHtml = '';
+                    let lastDateStr = '';
+ 
+                    messages.forEach(msg => {
+                        const msgDate = new Date(msg.timestamp);
+                        const currentDateStr = msgDate.toLocaleDateString('en-US', { 
+                            month: 'long', 
+                            day: 'numeric', 
+                            year: 'numeric' 
+                        });
+ 
+                        if (currentDateStr !== lastDateStr) {
+                            messagesHtml += `
+                                <div style="text-align: center; margin: 15px 0; font-size: 11px; color: #7a8186; font-weight: 600; user-select: none;">
+                                    <span style="background: #eef2f6; padding: 4px 12px; border-radius: 12px;">${currentDateStr}</span>
+                                </div>
+                            `;
+                            lastDateStr = currentDateStr;
+                        }
+ 
+                        let contentHtml = '';
+                        if (msg.type === 'audio') {
+                            contentHtml = `<audio src="${msg.text}" controls></audio>`;
+                        } else {
+                            contentHtml = `<div class="message-bubble">${msg.text}</div>`;
+                        }
+                        
+                        messagesHtml += `
+                            <div class="message ${msg.sender === window.currentUser ? 'sent' : 'received'}">
+                                <div class="message-content">
+                                    ${contentHtml}
+                                    <div class="message-time">${window.formatTime(msg.timestamp)}</div>
+                                </div>
+                            </div>
+                        `;
+                    });
+                    
+                    messagesArea.innerHTML = messagesHtml;
+                    
+                    if (wasAtBottom || oldScrollHeight === 0) {
+                        messagesArea.scrollTop = messagesArea.scrollHeight;
+                    }
+                }
+            }
+        }
+ 
+        window.handleSelectChat = function(contact) {
+            window.selectedChat = contact;
+            
+            const mainArea = document.getElementById('mainArea');
+            if (mainArea) {
+                mainArea.innerHTML = `
+                    <div class="chat-header">
+                        <button class="back-btn" onclick="window.handleBackToSidebar()">←</button>
+                        <div class="avatar" style="background: ${window.generateColor(window.selectedChat)};">
+                            ${window.getInitials(window.selectedChat)}
+                        </div>
+                        <div class="chat-header-info">
+                            <h2>${window.selectedChat}</h2>
+                            <p>Online</p>
+                        </div>
+                    </div>
+                    <div class="messages-area" id="messagesArea"></div>
+                    <div class="input-section">
+                        <button id="micBtn" onclick="window.handleVoiceMessage()" style="background: #e5e5ea; color: #000; padding: 10px; border-radius: 50%; width: 42px; height: 42px; display: flex; align-items: center; justify-content: center; border: none; cursor: pointer;">🎙️</button>
+                        <input type="text" id="messageInput" placeholder="Type a message..." autocomplete="off" />
+                        <button onclick="window.handleSendMessage()">Send</button>
+                    </div>
+                `;
+                document.getElementById('messageInput')?.focus();
+            }
+            
+            document.getElementById('appContainer')?.classList.add('show-chat');
+            window.updateData();
+        }
         
-        // Load your chat app JavaScript here
-        // (copy the entire script section from your Node server's HTML)
+        window.handleBackToSidebar = function() {
+            window.selectedChat = null;
+            document.getElementById('appContainer')?.classList.remove('show-chat');
+            window.updateData();
+        }
+ 
+        window.handleSendMessage = async function() {
+            const input = document.getElementById('messageInput');
+            if (!input) return;
+            const text = input.value.trim();
+            if (!text || !window.selectedChat) return;
+ 
+            const res = await window.sendMessage(window.currentUser, window.selectedChat, text, 'text');
+            if (!res.error) {
+                input.value = '';
+                window.updateData(); 
+            } else {
+                alert('Message failed to send. Try again!');
+            }
+        }
+ 
+        document.addEventListener('keypress', (e) => {
+            if (e.key === 'Enter' && e.target.id === 'messageInput') {
+                window.handleSendMessage();
+            }
+        });
+ 
+        window.startSync = function() {
+            if (refreshInterval) clearInterval(refreshInterval);
+            refreshInterval = setInterval(() => {
+                if (window.currentUser && window.selectedChat) {
+                    window.updateData();
+                }
+            }, 2000); 
+        }
+ 
+        window.handleVoiceMessage = async function() {
+            const micBtn = document.getElementById('micBtn');
+            
+            if (!navigator.mediaDevices || !navigator.mediaDevices.getUserMedia) {
+                alert('Audio recording is not supported on this browser or requires an HTTPS connection.');
+                return;
+            }
+ 
+            if (!isRecording) {
+                try {
+                    const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+                    mediaRecorder = new MediaRecorder(stream);
+                    audioChunks = [];
+                    mediaRecorder.ondataavailable = event => audioChunks.push(event.data);
+                    mediaRecorder.onstop = async () => {
+                        const audioBlob = new Blob(audioChunks, { type: 'audio/mp3' });
+                        const reader = new FileReader();
+                        reader.readAsDataURL(audioBlob); 
+                        reader.onloadend = async () => {
+                            const base64Audio = reader.result;
+                            const res = await window.sendMessage(window.currentUser, window.selectedChat, base64Audio, 'audio');
+                            if (!res.error) window.updateData();
+                        };
+                        stream.getTracks().forEach(track => track.stop());
+                    };
+                    mediaRecorder.start();
+                    isRecording = true;
+                    micBtn.classList.add('recording-active');
+                } catch (err) {
+                    alert('Could not open microphone. Check browser app permissions.');
+                }
+            } else {
+                mediaRecorder.stop();
+                isRecording = false;
+                micBtn.classList.remove('recording-active');
+            }
+        }
+ 
+        window.handleSetup = async function() {
+            const input = document.getElementById('phoneInput');
+            const phone = input.value.trim();
+            if (!phone) {
+                document.getElementById('setupError').textContent = 'Enter your phone number';
+                return;
+            }
+            const result = await window.initUser(phone);
+            if (result.error) {
+                document.getElementById('setupError').textContent = result.error;
+                return;
+            }
+            window.currentUser = phone;
+            localStorage.setItem('user', phone);
+            window.startSync();
+            window.renderStructure();
+        }
+ 
+        window.handleAddContact = async function() {
+            const input = document.getElementById('contactInput');
+            const contact = input.value.trim();
+            if (!contact) return;
+            if (contact === window.currentUser) {
+                alert('Cannot add yourself');
+                return;
+            }
+            await window.addContact(window.currentUser, contact);
+            input.value = '';
+            window.updateData();
+        }
+ 
+        const saved = localStorage.getItem('user');
+        if (saved) {
+            window.currentUser = saved;
+            window.startSync();
+        }
+        window.renderStructure();
     </script>
 </body>
 </html>
