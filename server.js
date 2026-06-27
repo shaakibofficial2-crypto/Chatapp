@@ -8,7 +8,6 @@ if (!mongoUri) {
     process.exit(1);
 }
 
-// Optimized connection configurations to prevent connection drops
 const client = new MongoClient(mongoUri, {
     maxPoolSize: 10,
     minPoolSize: 2,
@@ -104,254 +103,169 @@ const html = /* html */ `<!DOCTYPE html>
     <div id="app"></div>
  
     <script>
-        const API = window.location.origin + '/api';
+        // Compiled to ES5 clean syntax to prevent mobile container crashes
+        var API = window.location.origin + '/api';
  
         window.generateColor = function(str) {
-            const colors = ['#FF6B6B', '#4ECDC4', '#45B7D1', '#FFA07A', '#98D8C8', '#F7DC6F', '#BB8FCE', '#85C1E2'];
-            let hash = 0;
-            for (let i = 0; i < str.length; i++) { hash = str.charCodeAt(i) + ((hash << 5) - hash); }
+            var colors = ['#FF6B6B', '#4ECDC4', '#45B7D1', '#FFA07A', '#98D8C8', '#F7DC6F', '#BB8FCE', '#85C1E2'];
+            var hash = 0;
+            for (var i = 0; i < str.length; i++) { hash = str.charCodeAt(i) + ((hash << 5) - hash); }
             return colors[Math.abs(hash) % colors.length];
-        }
+        };
  
         window.getInitials = function(name) {
-            return name.split(' ').map(n => n[0]).join('').toUpperCase().slice(0, 2) || 'U';
-        }
+            return name.split(' ').map(function(n) { return n[0]; }).join('').toUpperCase().slice(0, 2) || 'U';
+        };
  
         window.formatTime = function(timestamp) {
-            const date = new Date(timestamp);
+            var date = new Date(timestamp);
             return date.getHours().toString().padStart(2, '0') + ':' + date.getMinutes().toString().padStart(2, '0');
-        }
+        };
  
         window.currentUser = null;
         window.selectedChat = null;
-        let refreshInterval = null;
-        let mediaRecorder = null;
-        let audioChunks = [];
-        let isRecording = false;
+        var refreshInterval = null;
+        var mediaRecorder = null;
+        var audioChunks = [];
+        var isRecording = false;
  
-        window.initUser = async function(phone) {
-            try {
-                const res = await fetch(API + '/init-user', {
-                    method: 'POST',
-                    headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify({ phone })
-                });
-                return await res.json();
-            } catch (error) { return { error: 'Cannot connect to server' }; }
-        }
+        window.initUser = function(phone) {
+            return fetch(API + '/init-user', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ phone: phone })
+            }).then(function(res) { return res.json(); }).catch(function() { return { error: 'Cannot connect to server' }; });
+        };
  
-        window.addContact = async function(phone, contact) {
-            try {
-                const res = await fetch(API + '/add-contact', {
-                    method: 'POST',
-                    headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify({ phone, contact })
-                });
-                return await res.json();
-            } catch (error) { return { error: 'Error' }; }
-        }
+        window.addContact = function(phone, contact) {
+            return fetch(API + '/add-contact', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ phone: phone, contact: contact })
+            }).then(function(res) { return res.json(); }).catch(function() { return { error: 'Error' }; });
+        };
  
-        window.getContacts = async function(phone) {
-            try {
-                const res = await fetch(API + '/contacts/' + phone);
-                return await res.json();
-            } catch (error) { return { contacts: [] }; }
-        }
+        window.getContacts = function(phone) {
+            return fetch(API + '/contacts/' + phone).then(function(res) { return res.json(); }).catch(function() { return { contacts: [] }; });
+        };
  
-        window.sendMessage = async function(sender, receiver, text, type = 'text') {
-            try {
-                const res = await fetch(API + '/send-message', {
-                    method: 'POST',
-                    headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify({ sender, receiver, text, type })
-                });
-                return await res.json();
-            } catch (error) { return { error: 'Error' }; }
-        }
+        window.sendMessage = function(sender, receiver, text, type) {
+            return fetch(API + '/send-message', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ sender: sender, receiver: receiver, text: text, type: type || 'text' })
+            }).then(function(res) { return res.json(); }).catch(function() { return { error: 'Error' }; });
+        };
  
-        window.getMessages = async function(user1, user2) {
-            try {
-                const res = await fetch(API + '/messages/' + user1 + '/' + user2);
-                return await res.json();
-            } catch (error) { return { messages: [] }; }
-        }
+        window.getMessages = function(user1, user2) {
+            return fetch(API + '/messages/' + user1 + '/' + user2).then(function(res) { return res.json(); }).catch(function() { return { messages: [] }; });
+        };
  
         window.renderStructure = function() {
-            const app = document.getElementById('app');
+            var app = document.getElementById('app');
             if (!window.currentUser) {
-                app.innerHTML = \`
-                    <div class="setup-screen">
-                        <div class="setup-card">
-                            <h1>Chat</h1>
-                            <input type="text" id="phoneInput" placeholder="Enter your phone number" />
-                            <button onclick="window.handleSetup()">Start</button>
-                            <div id="setupError" class="error"></div>
-                        </div>
-                    </div>
-                \`;
-                setTimeout(() => document.getElementById('phoneInput')?.focus(), 100);
+                app.innerHTML = '<div class="setup-screen"><div class="setup-card"><h1>Chat</h1><input type="text" id="phoneInput" placeholder="Enter your phone number" /><button onclick="window.handleSetup()">Start</button><div id="setupError" class="error"></div></div></div>';
+                setTimeout(function() { var p = document.getElementById('phoneInput'); if (p) p.focus(); }, 100);
                 return;
             }
  
-            app.innerHTML = \`
-                <div class="container" id="appContainer">
-                    <div class="sidebar">
-                        <div class="sidebar-header">
-                            <h2>Chats</h2>
-                            <div class="user-info">📱 \${window.currentUser}</div>
-                        </div>
-                        <div class="add-contact-section">
-                            <input type="text" id="contactInput" placeholder="Add contact phone" />
-                            <button onclick="window.handleAddContact()">Add</button>
-                        </div>
-                        <div class="chat-list" id="chatList"></div>
-                    </div>
-                    <div class="main" id="mainArea">
-                        <div class="placeholder">Select a chat to start messaging</div>
-                    </div>
-                </div>
-            \`;
+            app.innerHTML = '<div class="container" id="appContainer"><div class="sidebar"><div class="sidebar-header"><h2>Chats</h2><div class="user-info">📱 ' + window.currentUser + '</div></div><div class="add-contact-section"><input type="text" id="contactInput" placeholder="Add contact phone" /><button onclick="window.handleAddContact()">Add</button></div><div class="chat-list" id="chatList"></div></div><div class="main" id="mainArea"><div class="placeholder">Select a chat to start messaging</div></div></div>';
             window.updateData();
-        }
+        };
  
-        // 🛠️ Telegram Update: Groups chat history under custom date headers dynamically
-        window.updateData = async function() {
+        window.updateData = function() {
             if (!window.currentUser) return;
  
-            const chatList = document.getElementById('chatList');
+            var chatList = document.getElementById('chatList');
             if (chatList) {
-                const contactsData = await window.getContacts(window.currentUser);
-                const contacts = contactsData.contacts || [];
-                if (contacts.length === 0) {
-                    chatList.innerHTML = '<div class="empty-state">No chats yet.<br>Add a contact phone to start!</div>';
-                } else {
-                    chatList.innerHTML = contacts.map(contact => {
-                        const isActive = window.selectedChat === contact ? 'active' : '';
-                        return \`
-                            <div class="chat-item \${isActive}" onclick="window.handleSelectChat('\${contact}')">
-                                <div class="avatar" style="background: \${window.generateColor(contact)};">
-                                    \${window.getInitials(contact)}
-                                </div>
-                                <div class="chat-info">
-                                    <h3>\${contact}</h3>
-                                    <p>Tap to open messages</p>
-                                </div>
-                            </div>
-                        \`;
-                    }).join('');
-                }
-            }
- 
-            const messagesArea = document.getElementById('messagesArea');
-            if (window.selectedChat && messagesArea) {
-                const messagesData = await window.getMessages(window.currentUser, window.selectedChat);
-                const messages = messagesData.messages || [];
-                
-                const oldScrollHeight = messagesArea.scrollHeight;
-                const wasAtBottom = messagesArea.scrollTop + messagesArea.clientHeight >= oldScrollHeight - 20;
- 
-                if (messages.length === 0) {
-                    messagesArea.innerHTML = '<div style="flex: 1; display: flex; align-items: center; justify-content: center; color: #999;">Start a conversation</div>';
-                } else {
-                    let messagesHtml = '';
-                    let lastDateStr = '';
-
-                    messages.forEach(msg => {
-                        const msgDate = new Date(msg.timestamp);
-                        const currentDateStr = msgDate.toLocaleDateString('en-US', { 
-                            month: 'long', 
-                            day: 'numeric', 
-                            year: 'numeric' 
-                        });
-
-                        // Inject dynamic centered Telegram-style date headers
-                        if (currentDateStr !== lastDateStr) {
-                            messagesHtml += \`
-                                <div style="text-align: center; margin: 15px 0; font-size: 11px; color: #7a8186; font-weight: 600; user-select: none;">
-                                    <span style="background: #eef2f6; padding: 4px 12px; border-radius: 12px;">\${currentDateStr}</span>
-                                </div>
-                            \`;
-                            lastDateStr = currentDateStr;
-                        }
-
-                        let contentHtml = '';
-                        if (msg.type === 'audio') {
-                            contentHtml = \`<audio src="\${msg.text}" controls></audio>\`;
-                        } else {
-                            contentHtml = \`<div class="message-bubble">\${msg.text}</div>\`;
-                        }
-                        
-                        messagesHtml += \`
-                            <div class="message \${msg.sender === window.currentUser ? 'sent' : 'received'}">
-                                <div class="message-content">
-                                    \${contentHtml}
-                                    <div class="message-time">\${window.formatTime(msg.timestamp)}</div>
-                                </div>
-                            </div>
-                        \`;
-                    });
-                    
-                    messagesArea.innerHTML = messagesHtml;
-                    
-                    if (wasAtBottom || oldScrollHeight === 0) {
-                        messagesArea.scrollTop = messagesArea.scrollHeight;
+                window.getContacts(window.currentUser).then(function(contactsData) {
+                    var contacts = contactsData.contacts || [];
+                    if (contacts.length === 0) {
+                        chatList.innerHTML = '<div class="empty-state">No chats yet.<br>Add a contact phone to start!</div>';
+                    } else {
+                        chatList.innerHTML = contacts.map(function(contact) {
+                            var isActive = window.selectedChat === contact ? 'active' : '';
+                            return '<div class="chat-item ' + isActive + '" onclick="window.handleSelectChat(\'' + contact + '\')"><div class="avatar" style="background: ' + window.generateColor(contact) + ';">' + window.getInitials(contact) + '</div><div class="chat-info"><h3>' + contact + '</h3><p>Tap to open messages</p></div></div>';
+                        }).join('');
                     }
-                }
+                });
             }
-        }
+ 
+            var messagesArea = document.getElementById('messagesArea');
+            if (window.selectedChat && messagesArea) {
+                window.getMessages(window.currentUser, window.selectedChat).then(function(messagesData) {
+                    var messages = messagesData.messages || [];
+                    var oldScrollHeight = messagesArea.scrollHeight;
+                    var wasAtBottom = messagesArea.scrollTop + messagesArea.clientHeight >= oldScrollHeight - 20;
+ 
+                    if (messages.length === 0) {
+                        messagesArea.innerHTML = '<div style="flex: 1; display: flex; align-items: center; justify-content: center; color: #999;">Start a conversation</div>';
+                    } else {
+                        var messagesHtml = '';
+                        var lastDateStr = '';
+ 
+                        messages.forEach(function(msg) {
+                            var msgDate = new Date(msg.timestamp);
+                            var currentDateStr = msgDate.toLocaleDateString('en-US', { month: 'long', day: 'numeric', year: 'numeric' });
+ 
+                            if (currentDateStr !== lastDateStr) {
+                                messagesHtml += '<div style="text-align: center; margin: 15px 0; font-size: 11px; color: #7a8186; font-weight: 600; user-select: none;"><span style="background: #eef2f6; padding: 4px 12px; border-radius: 12px;">' + currentDateStr + '</span></div>';
+                                lastDateStr = currentDateStr;
+                            }
+ 
+                            var contentHtml = '';
+                            if (msg.type === 'audio') {
+                                contentHtml = '<audio src="' + msg.text + '" controls></audio>';
+                            } else {
+                                contentHtml = '<div class="message-bubble">' + msg.text + '</div>';
+                            }
+                            
+                            messagesHtml += '<div class="message ' + (msg.sender === window.currentUser ? 'sent' : 'received') + '"><div class="message-content">' + contentHtml + '<div class="message-time">' + window.formatTime(msg.timestamp) + '</div></div></div>';
+                        });
+                        
+                        messagesArea.innerHTML = messagesHtml;
+                        if (wasAtBottom || oldScrollHeight === 0) {
+                            messagesArea.scrollTop = messagesArea.scrollHeight;
+                        }
+                    }
+                });
+            }
+        };
  
         window.handleSelectChat = function(contact) {
             window.selectedChat = contact;
-            
-            const mainArea = document.getElementById('mainArea');
+            var mainArea = document.getElementById('mainArea');
             if (mainArea) {
-                mainArea.innerHTML = \`
-                    <div class="chat-header">
-                        <button class="back-btn" onclick="window.handleBackToSidebar()">←</button>
-                        <div class="avatar" style="background: \${window.generateColor(window.selectedChat)};">
-                            \${window.getInitials(window.selectedChat)}
-                        </div>
-                        <div class="chat-header-info">
-                            <h2>\${window.selectedChat}</h2>
-                            <p>Online</p>
-                        </div>
-                    </div>
-                    <div class="messages-area" id="messagesArea"></div>
-                    <div class="input-section">
-                        <button id="micBtn" onclick="window.handleVoiceMessage()" style="background: #e5e5ea; color: #000; padding: 10px; border-radius: 50%; width: 42px; height: 42px; display: flex; align-items: center; justify-content: center; border: none; cursor: pointer;">🎙️</button>
-                        <input type="text" id="messageInput" placeholder="Type a message..." autocomplete="off" />
-                        <button onclick="window.handleSendMessage()">Send</button>
-                    </div>
-                \`;
-                document.getElementById('messageInput')?.focus();
+                mainArea.innerHTML = '<div class="chat-header"><button class="back-btn" onclick="window.handleBackToSidebar()">←</button><div class="avatar" style="background: ' + window.generateColor(window.selectedChat) + ';">' + window.getInitials(window.selectedChat) + '</div><div class="chat-header-info"><h2>' + window.selectedChat + '</h2><p>Online</p></div></div><div class="messages-area" id="messagesArea"></div><div class="input-section"><button id="micBtn" onclick="window.handleVoiceMessage()" style="background: #e5e5ea; color: #000; padding: 10px; border-radius: 50%; width: 42px; height: 42px; display: flex; align-items: center; justify-content: center; border: none; cursor: pointer;">🎙️</button><input type="text" id="messageInput" placeholder="Type a message..." autocomplete="off" /><button onclick="window.handleSendMessage()">Send</button></div>';
+                var msgInp = document.getElementById('messageInput'); if (msgInp) msgInp.focus();
             }
-            
-            document.getElementById('appContainer')?.classList.add('show-chat');
+            var appCont = document.getElementById('appContainer'); if (appCont) appCont.classList.add('show-chat');
             window.updateData();
-        }
+        };
         
         window.handleBackToSidebar = function() {
             window.selectedChat = null;
-            document.getElementById('appContainer')?.classList.remove('show-chat');
+            var appCont = document.getElementById('appContainer'); if (appCont) appCont.classList.remove('show-chat');
             window.updateData();
-        }
+        };
  
-        window.handleSendMessage = async function() {
-            const input = document.getElementById('messageInput');
+        window.handleSendMessage = function() {
+            var input = document.getElementById('messageInput');
             if (!input) return;
-            const text = input.value.trim();
+            var text = input.value.trim();
             if (!text || !window.selectedChat) return;
  
-            const res = await window.sendMessage(window.currentUser, window.selectedChat, text, 'text');
-            if (!res.error) {
-                input.value = '';
-                window.updateData(); 
-            } else {
-                alert('Message failed to send. Try again!');
-            }
-        }
+            window.sendMessage(window.currentUser, window.selectedChat, text, 'text').then(function(res) {
+                if (!res.error) {
+                    input.value = '';
+                    window.updateData(); 
+                } else {
+                    alert('Message failed to send. Try again!');
+                }
+            });
+        };
  
-        document.addEventListener('keypress', (e) => {
+        document.addEventListener('keypress', function(e) {
             if (e.key === 'Enter' && e.target.id === 'messageInput') {
                 window.handleSendMessage();
             }
@@ -359,83 +273,84 @@ const html = /* html */ `<!DOCTYPE html>
  
         window.startSync = function() {
             if (refreshInterval) clearInterval(refreshInterval);
-            refreshInterval = setInterval(() => {
+            refreshInterval = setInterval(function() {
                 if (window.currentUser && window.selectedChat) {
                     window.updateData();
                 }
             }, 2000); 
-        }
+        };
  
-        window.handleVoiceMessage = async function() {
-            const micBtn = document.getElementById('micBtn');
-            
+        window.handleVoiceMessage = function() {
+            var micBtn = document.getElementById('micBtn');
             if (!navigator.mediaDevices || !navigator.mediaDevices.getUserMedia) {
-                alert('Audio recording is not supported on this browser or requires an HTTPS connection.');
+                alert('Audio recording is not supported on this browser context.');
                 return;
             }
  
             if (!isRecording) {
-                try {
-                    const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+                navigator.mediaDevices.getUserMedia({ audio: true }).then(function(stream) {
                     mediaRecorder = new MediaRecorder(stream);
                     audioChunks = [];
-                    mediaRecorder.ondataavailable = event => audioChunks.push(event.data);
-                    mediaRecorder.onstop = async () => {
-                        const audioBlob = new Blob(audioChunks, { type: 'audio/mp3' });
-                        const reader = new FileReader();
+                    mediaRecorder.ondataavailable = function(event) { audioChunks.push(event.data); };
+                    mediaRecorder.onstop = function() {
+                        var audioBlob = new Blob(audioChunks, { type: 'audio/mp3' });
+                        var reader = new FileReader();
                         reader.readAsDataURL(audioBlob); 
-                        reader.onloadend = async () => {
-                            const base64Audio = reader.result;
-                            const res = await window.sendMessage(window.currentUser, window.selectedChat, base64Audio, 'audio');
-                            if (!res.error) window.updateData();
+                        reader.onloadend = function() {
+                            var base64Audio = reader.result;
+                            window.sendMessage(window.currentUser, window.selectedChat, base64Audio, 'audio').then(function(res) {
+                                if (!res.error) window.updateData();
+                            });
                         };
-                        stream.getTracks().forEach(track => track.stop());
+                        stream.getTracks().forEach(function(track) { track.stop(); });
                     };
                     mediaRecorder.start();
                     isRecording = true;
                     micBtn.classList.add('recording-active');
-                } catch (err) {
-                    alert('Could not open microphone. Check browser app permissions.');
-                }
+                }).catch(function() {
+                    alert('Could not open microphone. Check browser settings.');
+                });
             } else {
                 mediaRecorder.stop();
                 isRecording = false;
                 micBtn.classList.remove('recording-active');
             }
-        }
+        };
  
-        window.handleSetup = async function() {
-            const input = document.getElementById('phoneInput');
-            const phone = input.value.trim();
+        window.handleSetup = function() {
+            var input = document.getElementById('phoneInput');
+            var phone = input.value.trim();
             if (!phone) {
                 document.getElementById('setupError').textContent = 'Enter your phone number';
                 return;
             }
-            const result = await window.initUser(phone);
-            if (result.error) {
-                document.getElementById('setupError').textContent = result.error;
-                return;
-            }
-            window.currentUser = phone;
-            localStorage.setItem('user', phone);
-            window.startSync();
-            window.renderStructure();
-        }
+            window.initUser(phone).then(function(result) {
+                if (result.error) {
+                    document.getElementById('setupError').textContent = result.error;
+                    return;
+                }
+                window.currentUser = phone;
+                localStorage.setItem('user', phone);
+                window.startSync();
+                window.renderStructure();
+            });
+        };
  
-        window.handleAddContact = async function() {
-            const input = document.getElementById('contactInput');
-            const contact = input.value.trim();
+        window.handleAddContact = function() {
+            var input = document.getElementById('contactInput');
+            var contact = input.value.trim();
             if (!contact) return;
             if (contact === window.currentUser) {
                 alert('Cannot add yourself');
                 return;
             }
-            await window.addContact(window.currentUser, contact);
-            input.value = '';
-            window.updateData();
-        }
+            window.addContact(window.currentUser, contact).then(function() {
+                input.value = '';
+                window.updateData();
+            });
+        };
  
-        const saved = localStorage.getItem('user');
+        var saved = localStorage.getItem('user');
         if (saved) {
             window.currentUser = saved;
             window.startSync();
@@ -632,4 +547,3 @@ async function startServer() {
 }
 
 startServer();
-// force change fix v3git add .
