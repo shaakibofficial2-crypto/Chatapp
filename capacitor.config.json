@@ -4,6 +4,12 @@
   "webDir": "public",
   "server": {
     "url": "https://chatapp-hltm.onrender.com",
-    "cleartext": false
+    "cleartext": false,
+    "launchAutoLogin": true
+  },
+  "plugins": {
+    "SplashScreen": {
+      "launchShowDuration": 0
+    }
   }
 }
