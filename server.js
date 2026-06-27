@@ -103,7 +103,6 @@ const html = /* html */ `<!DOCTYPE html>
     <div id="app"></div>
  
     <script>
-        // Compiled to ES5 clean syntax to prevent mobile container crashes
         var API = window.location.origin + '/api';
  
         window.generateColor = function(str) {
@@ -185,7 +184,7 @@ const html = /* html */ `<!DOCTYPE html>
                     } else {
                         chatList.innerHTML = contacts.map(function(contact) {
                             var isActive = window.selectedChat === contact ? 'active' : '';
-                            return '<div class="chat-item ' + isActive + '" onclick="window.handleSelectChat(\'' + contact + '\')"><div class="avatar" style="background: ' + window.generateColor(contact) + ';">' + window.getInitials(contact) + '</div><div class="chat-info"><h3>' + contact + '</h3><p>Tap to open messages</p></div></div>';
+                            return '<div class="chat-item ' + isActive + '" onclick="window.handleSelectChat(\\'\\' + contact + '\\'\\')"><div class="avatar" style="background: ' + window.generateColor(contact) + ';">' + window.getInitials(contact) + '</div><div class="chat-info"><h3>' + contact + '</h3><p>Tap to open messages</p></div></div>';
                         }).join('');
                     }
                 });
