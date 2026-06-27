@@ -8,7 +8,7 @@ if (!mongoUri) {
     process.exit(1);
 }
 
-// Optimized connection configurations to prevent connection pooling drops (502 errors)
+// Optimized connection configurations to prevent connection drops
 const client = new MongoClient(mongoUri, {
     maxPoolSize: 10,
     minPoolSize: 2,
@@ -214,6 +214,7 @@ const html = /* html */ `<!DOCTYPE html>
             window.updateData();
         }
  
+        // 🛠️ Telegram Update: Groups chat history under custom date headers dynamically
         window.updateData = async function() {
             if (!window.currentUser) return;
  
@@ -252,7 +253,27 @@ const html = /* html */ `<!DOCTYPE html>
                 if (messages.length === 0) {
                     messagesArea.innerHTML = '<div style="flex: 1; display: flex; align-items: center; justify-content: center; color: #999;">Start a conversation</div>';
                 } else {
-                    messagesArea.innerHTML = messages.map(msg => {
+                    let messagesHtml = '';
+                    let lastDateStr = '';
+
+                    messages.forEach(msg => {
+                        const msgDate = new Date(msg.timestamp);
+                        const currentDateStr = msgDate.toLocaleDateString('en-US', { 
+                            month: 'long', 
+                            day: 'numeric', 
+                            year: 'numeric' 
+                        });
+
+                        // Inject dynamic centered Telegram-style date headers
+                        if (currentDateStr !== lastDateStr) {
+                            messagesHtml += \`
+                                <div style="text-align: center; margin: 15px 0; font-size: 11px; color: #7a8186; font-weight: 600; user-select: none;">
+                                    <span style="background: #eef2f6; padding: 4px 12px; border-radius: 12px;">\${currentDateStr}</span>
+                                </div>
+                            \`;
+                            lastDateStr = currentDateStr;
+                        }
+
                         let contentHtml = '';
                         if (msg.type === 'audio') {
                             contentHtml = \`<audio src="\${msg.text}" controls></audio>\`;
@@ -260,7 +281,7 @@ const html = /* html */ `<!DOCTYPE html>
                             contentHtml = \`<div class="message-bubble">\${msg.text}</div>\`;
                         }
                         
-                        return \`
+                        messagesHtml += \`
                             <div class="message \${msg.sender === window.currentUser ? 'sent' : 'received'}">
                                 <div class="message-content">
                                     \${contentHtml}
@@ -268,7 +289,9 @@ const html = /* html */ `<!DOCTYPE html>
                                 </div>
                             </div>
                         \`;
-                    }).join('');
+                    });
+                    
+                    messagesArea.innerHTML = messagesHtml;
                     
                     if (wasAtBottom || oldScrollHeight === 0) {
                         messagesArea.scrollTop = messagesArea.scrollHeight;
@@ -609,7 +632,4 @@ async function startServer() {
 }
 
 startServer();
-
-
-
-// force change fix
+// force change fix v3git add .
