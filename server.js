@@ -8,7 +8,15 @@ if (!mongoUri) {
     process.exit(1);
 }
 
-const client = new MongoClient(mongoUri);
+// Optimized connection configurations to prevent connection pooling drops (502 errors)
+const client = new MongoClient(mongoUri, {
+    maxPoolSize: 10,
+    minPoolSize: 2,
+    maxIdleTimeMS: 30000,
+    connectTimeoutMS: 10000,
+    socketTimeoutMS: 45000
+});
+
 let db, usersCollection, chatsCollection;
 
 async function connectDB() {
@@ -23,8 +31,6 @@ async function connectDB() {
         process.exit(1);
     }
 }
-
-// NOTE: We removed the standalone connectDB() call from here so it runs inside our wrapper down below.
  
 const html = /* html */ `<!DOCTYPE html>
 <html lang="en">
@@ -447,6 +453,11 @@ const server = http.createServer((req, res) => {
         req.on('data', chunk => body += chunk);
         req.on('end', async () => {
             try {
+                if (!usersCollection) {
+                    res.writeHead(503);
+                    res.end(JSON.stringify({ error: 'Database initializing' }));
+                    return;
+                }
                 const { phone } = JSON.parse(body);
                 if (!phone) {
                     res.writeHead(400);
@@ -462,7 +473,7 @@ const server = http.createServer((req, res) => {
                 res.writeHead(200);
                 res.end(JSON.stringify({ success: true, phone }));
             } catch (e) {
-                res.writeHead(400);
+                res.writeHead(500);
                 res.end(JSON.stringify({ error: 'Database update failed' }));
             }
         });
@@ -474,6 +485,11 @@ const server = http.createServer((req, res) => {
         req.on('data', chunk => body += chunk);
         req.on('end', async () => {
             try {
+                if (!usersCollection) {
+                    res.writeHead(503);
+                    res.end(JSON.stringify({ error: 'Database initializing' }));
+                    return;
+                }
                 const { phone, contact } = JSON.parse(body);
                 if (!phone || !contact) {
                     res.writeHead(400);
@@ -490,8 +506,8 @@ const server = http.createServer((req, res) => {
                 res.writeHead(200);
                 res.end(JSON.stringify({ success: true }));
             } catch (e) {
-                res.writeHead(400);
-                res.end(JSON.stringify({ error: 'Invalid request' }));
+                res.writeHead(500);
+                res.end(JSON.stringify({ error: 'Invalid database query execution' }));
             }
         });
         return;
@@ -500,10 +516,20 @@ const server = http.createServer((req, res) => {
     if (pathname.startsWith('/api/contacts/') && req.method === 'GET') {
         const phone = pathname.split('/')[3];
         (async () => {
-            const user = await usersCollection.findOne({ phone });
-            const contacts = user ? user.contacts : [];
-            res.writeHead(200);
-            res.end(JSON.stringify({ contacts }));
+            try {
+                if (!usersCollection) {
+                    res.writeHead(503);
+                    res.end(JSON.stringify({ error: 'Database initializing' }));
+                    return;
+                }
+                const user = await usersCollection.findOne({ phone });
+                const contacts = user ? user.contacts : [];
+                res.writeHead(200);
+                res.end(JSON.stringify({ contacts }));
+            } catch(err) {
+                res.writeHead(500);
+                res.end(JSON.stringify({ contacts: [] }));
+            }
         })();
         return;
     }
@@ -513,6 +539,11 @@ const server = http.createServer((req, res) => {
         req.on('data', chunk => body += chunk);
         req.on('end', async () => {
             try {
+                if (!chatsCollection) {
+                    res.writeHead(503);
+                    res.end(JSON.stringify({ error: 'Database initializing' }));
+                    return;
+                }
                 const { sender, receiver, text, type } = JSON.parse(body);
                 if (!sender || !receiver || !text) {
                     res.writeHead(400);
@@ -532,7 +563,7 @@ const server = http.createServer((req, res) => {
                 res.writeHead(200);
                 res.end(JSON.stringify({ success: true }));
             } catch (e) {
-                res.writeHead(400);
+                res.writeHead(500);
                 res.end(JSON.stringify({ error: 'Invalid request' }));
             }
         });
@@ -546,9 +577,19 @@ const server = http.createServer((req, res) => {
         const chatId = [user1, user2].sort().join('_');
         
         (async () => {
-            const messages = await chatsCollection.find({ chatId }).sort({ timestamp: 1 }).toArray();
-            res.writeHead(200);
-            res.end(JSON.stringify({ messages }));
+            try {
+                if (!chatsCollection) {
+                    res.writeHead(503);
+                    res.end(JSON.stringify({ error: 'Database initializing' }));
+                    return;
+                }
+                const messages = await chatsCollection.find({ chatId }).sort({ timestamp: 1 }).toArray();
+                res.writeHead(200);
+                res.end(JSON.stringify({ messages }));
+            } catch(err) {
+                res.writeHead(500);
+                res.end(JSON.stringify({ messages: [] }));
+            }
         })();
         return;
     }
@@ -557,11 +598,10 @@ const server = http.createServer((req, res) => {
     res.end(JSON.stringify({ error: 'Not found' }));
 });
  
-// 🛠️ WRAPPED BOOT ORDER HERE: Forces server to wait for MongoDB variables to populate first!
 const PORT = process.env.PORT || 3000;
 
 async function startServer() {
-    await connectDB(); // Establish Atlas link first
+    await connectDB(); 
     
     server.listen(PORT, "0.0.0.0", () => {
         console.log(`Server is running on port ${PORT}`);
