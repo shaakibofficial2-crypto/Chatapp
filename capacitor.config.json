@@ -1,5 +1,9 @@
 {
-  "appId": "com.example.app",
+  "appId": "com.chatapp.mobile",
   "appName": "ChatApp",
-  "webDir": "www"
+  "webDir": "public",
+  "server": {
+    "url": "https://chatapp-hltm.onrender.com",
+    "cleartext": false
+  }
 }
