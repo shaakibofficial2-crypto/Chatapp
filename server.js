@@ -1,8 +1,32 @@
 const http = require('http');
 const url = require('url');
- 
-let users = {};
-let chats = {};
+const { MongoClient } = require('mongodb'); // 1. Import MongoDB Driver
+
+// 2. Connect using the Environment variable we just saved on Render!
+const mongoUri = process.env.MONGO_URI;
+if (!mongoUri) {
+    console.error("❌ ERROR: MONGO_URI environment variable is missing!");
+    process.exit(1);
+}
+
+const client = new MongoClient(mongoUri);
+let db, usersCollection, chatsCollection;
+
+async function connectDB() {
+    try {
+        await client.connect();
+        db = client.db('chat-app-db'); // This creates your database automatically
+        usersCollection = db.collection('users');
+        chatsCollection = db.collection('chats');
+        console.log("✅ Successfully connected to MongoDB Atlas Cloud!");
+    } catch (err) {
+        console.error("❌ MongoDB connection failed:", err);
+        process.exit(1);
+    }
+}
+
+// Start database connection
+connectDB();
  
 const html = /* html */ `<!DOCTYPE html>
 <html lang="en">
@@ -76,7 +100,7 @@ const html = /* html */ `<!DOCTYPE html>
     <div id="app"></div>
  
     <script>
-        const API = 'https://chatapp-hltm.onrender.com/api';
+        const API = window.location.origin + '/api';
  
         window.generateColor = function(str) {
             const colors = ['#FF6B6B', '#4ECDC4', '#45B7D1', '#FFA07A', '#98D8C8', '#F7DC6F', '#BB8FCE', '#85C1E2'];
@@ -322,7 +346,7 @@ const html = /* html */ `<!DOCTYPE html>
                 alert('Audio recording is not supported on this browser or requires an HTTPS connection.');
                 return;
             }
-
+ 
             if (!isRecording) {
                 try {
                     const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
@@ -370,7 +394,7 @@ const html = /* html */ `<!DOCTYPE html>
             window.startSync();
             window.renderStructure();
         }
-
+ 
         window.handleAddContact = async function() {
             const input = document.getElementById('contactInput');
             const contact = input.value.trim();
@@ -383,7 +407,7 @@ const html = /* html */ `<!DOCTYPE html>
             input.value = '';
             window.updateData();
         }
-
+ 
         const saved = localStorage.getItem('user');
         if (saved) {
             window.currentUser = saved;
@@ -402,7 +426,6 @@ const server = http.createServer((req, res) => {
     res.setHeader('Access-Control-Allow-Methods', 'GET, POST, OPTIONS');
     res.setHeader('Access-Control-Allow-Headers', 'Content-Type');
     
-    // ANTI-CACHING HEADERS ADDED HERE!
     res.setHeader('Cache-Control', 'no-store, no-cache, must-revalidate, proxy-revalidate');
     res.setHeader('Pragma', 'no-cache');
     res.setHeader('Expires', '0');
@@ -421,10 +444,11 @@ const server = http.createServer((req, res) => {
         return;
     }
  
+    // 3. API Changes to look into MongoDB Atlas Cloud Database
     if (pathname === '/api/init-user' && req.method === 'POST') {
         let body = '';
         req.on('data', chunk => body += chunk);
-        req.on('end', () => {
+        req.on('end', async () => {
             try {
                 const { phone } = JSON.parse(body);
                 if (!phone) {
@@ -432,12 +456,17 @@ const server = http.createServer((req, res) => {
                     res.end(JSON.stringify({ error: 'Phone required' }));
                     return;
                 }
-                if (!users[phone]) users[phone] = { phone, contacts: [] };
+                
+                let user = await usersCollection.findOne({ phone });
+                if (!user) {
+                    await usersCollection.insertOne({ phone, contacts: [] });
+                }
+                
                 res.writeHead(200);
                 res.end(JSON.stringify({ success: true, phone }));
             } catch (e) {
                 res.writeHead(400);
-                res.end(JSON.stringify({ error: 'Invalid request' }));
+                res.end(JSON.stringify({ error: 'Database update failed' }));
             }
         });
         return;
@@ -446,7 +475,7 @@ const server = http.createServer((req, res) => {
     if (pathname === '/api/add-contact' && req.method === 'POST') {
         let body = '';
         req.on('data', chunk => body += chunk);
-        req.on('end', () => {
+        req.on('end', async () => {
             try {
                 const { phone, contact } = JSON.parse(body);
                 if (!phone || !contact) {
@@ -454,10 +483,14 @@ const server = http.createServer((req, res) => {
                     res.end(JSON.stringify({ error: 'Missing fields' }));
                     return;
                 }
-                if (!users[phone]) users[phone] = { phone, contacts: [] };
-                if (!users[phone].contacts.includes(contact)) {
-                    users[phone].contacts.push(contact);
-                }
+                
+                // Add contact if it doesn't exist yet inside array
+                await usersCollection.updateOne(
+                    { phone: phone },
+                    { $addToSet: { contacts: contact } },
+                    { upsert: true }
+                );
+                
                 res.writeHead(200);
                 res.end(JSON.stringify({ success: true }));
             } catch (e) {
@@ -470,16 +503,19 @@ const server = http.createServer((req, res) => {
  
     if (pathname.startsWith('/api/contacts/') && req.method === 'GET') {
         const phone = pathname.split('/')[3];
-        const contacts = users[phone]?.contacts || [];
-        res.writeHead(200);
-        res.end(JSON.stringify({ contacts }));
+        (async () => {
+            const user = await usersCollection.findOne({ phone });
+            const contacts = user ? user.contacts : [];
+            res.writeHead(200);
+            res.end(JSON.stringify({ contacts }));
+        })();
         return;
     }
  
     if (pathname === '/api/send-message' && req.method === 'POST') {
         let body = '';
         req.on('data', chunk => body += chunk);
-        req.on('end', () => {
+        req.on('end', async () => {
             try {
                 const { sender, receiver, text, type } = JSON.parse(body);
                 if (!sender || !receiver || !text) {
@@ -488,8 +524,15 @@ const server = http.createServer((req, res) => {
                     return;
                 }
                 const chatId = [sender, receiver].sort().join('_');
-                if (!chats[chatId]) chats[chatId] = [];
-                chats[chatId].push({ sender, text, type: type || 'text', timestamp: Date.now() });
+                
+                await chatsCollection.insertOne({
+                    chatId,
+                    sender,
+                    text,
+                    type: type || 'text',
+                    timestamp: Date.now()
+                });
+                
                 res.writeHead(200);
                 res.end(JSON.stringify({ success: true }));
             } catch (e) {
@@ -505,9 +548,12 @@ const server = http.createServer((req, res) => {
         const user1 = parts[3];
         const user2 = parts[4];
         const chatId = [user1, user2].sort().join('_');
-        const messages = chats[chatId] || [];
-        res.writeHead(200);
-        res.end(JSON.stringify({ messages }));
+        
+        (async () => {
+            const messages = await chatsCollection.find({ chatId }).sort({ timestamp: 1 }).toArray();
+            res.writeHead(200);
+            res.end(JSON.stringify({ messages }));
+        })();
         return;
     }
  
