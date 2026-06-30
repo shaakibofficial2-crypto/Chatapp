@@ -1,0 +1,269 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>ChatApp - Room Based</title>
+    <style>
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        :root {
+            --primary: #0084ff;
+            --dark-bg: #0a0e27;
+            --dark-card: #1a1f3a;
+            --dark-border: #2d3548;
+            --text-primary: #fff;
+            --text-secondary: #999;
+            --accent: #ff6b00;
+        }
+        body.light-mode {
+            --dark-bg: #f5f5f5; --dark-card: #fff; --dark-border: #e0e0e0;
+            --text-primary: #000; --text-secondary: #666;
+        }
+        body { 
+            font-family: -apple-system, sans-serif; background: var(--dark-bg);
+            color: var(--text-primary); overflow: hidden; transition: background 0.3s;
+        }
+        .container { display: flex; height: 100vh; width: 100vw; }
+        .sidebar { width: 320px; border-right: 1px solid var(--dark-border); display: flex; flex-direction: column; background: var(--dark-card); height: 100%; }
+        .main { flex: 1; display: flex; flex-direction: column; background: var(--dark-bg); }
+        .sidebar-header { padding: 16px; border-bottom: 1px solid var(--dark-border); }
+        .user-info { font-size: 12px; color: var(--text-secondary); padding: 8px; background: var(--dark-bg); border-radius: 6px; margin-top: 10px; }
+        .action-buttons, .sidebar-footer { padding: 12px 16px; display: flex; gap: 8px; border-bottom: 1px solid var(--dark-border); }
+        .action-buttons button, .sidebar-footer button, .modal-buttons button { flex: 1; padding: 10px; background: var(--primary); color: white; border: none; border-radius: 8px; cursor: pointer; font-weight: 600; }
+        .action-buttons button.secondary, .modal-buttons button.secondary { background: var(--dark-border); color: var(--text-primary); }
+        .rooms-list { flex: 1; overflow-y: auto; }
+        .room-item { padding: 12px 16px; border-bottom: 1px solid var(--dark-border); cursor: pointer; }
+        .room-item.active { background: var(--primary); color: white; }
+        .chat-header { padding: 14px 20px; border-bottom: 1px solid var(--dark-border); }
+        .messages-area { flex: 1; overflow-y: auto; padding: 16px; display: flex; flex-direction: column; gap: 8px; }
+        .message { display: flex; }
+        .message.sent { justify-content: flex-end; }
+        .message.received { justify-content: flex-start; }
+        .message-content { max-width: 70%; display: flex; flex-direction: column; }
+        .message-bubble { padding: 10px 14px; border-radius: 14px; font-size: 14px; word-break: break-word; }
+        .message.sent .message-bubble { background: var(--primary); color: white; }
+        .message.received .message-bubble { background: var(--dark-border); color: var(--text-primary); }
+        .message-user { font-size: 11px; color: var(--accent); margin-bottom: 4px; font-weight: bold; }
+        .input-section { padding: 12px 16px; border-top: 1px solid var(--dark-border); display: flex; gap: 8px; align-items: center; }
+        .input-section input { flex: 1; padding: 10px; border-radius: 20px; border: 1px solid var(--dark-border); background: var(--dark-bg); color: white; outline: none; }
+        .input-section button { padding: 10px 16px; background: var(--primary); color: white; border: none; border-radius: 20px; cursor: pointer; font-weight: bold; }
+        .media-btn { background: var(--dark-border) !important; color: var(--text-primary) !important; font-size: 16px; }
+        .voice-recording { background: #d93838 !important; animation: pulse 1.5s infinite; }
+        .chat-img { max-width: 100%; max-height: 250px; border-radius: 8px; margin-top: 4px; display: block; }
+        audio { margin-top: 4px; max-width: 240px; display: block; }
+        .modal { position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.8); display: none; align-items: center; justify-content: center; z-index: 1000; }
+        .modal.show { display: flex; }
+        .modal-content { background: var(--dark-card); padding: 24px; border-radius: 12px; width: 90%; max-width: 400px; }
+        .modal-content input { width: 100%; padding: 10px; margin-bottom: 12px; border-radius: 8px; border: 1px solid var(--dark-border); background: var(--dark-bg); color: white; outline: none; }
+        @keyframes pulse { 0% { opacity: 1; } 50% { opacity: 0.5; } 100% { opacity: 1; } }
+        @media (max-width: 768px) { .sidebar { width: 100%; position: absolute; left: 0; top: 0; transform: translateX(-100%); transition: 0.3s; z-index: 100; } .main { width: 100%; } }
+    </style>
+</head>
+<body>
+    <div id="app"></div>
+    <div id="setupModal" class="modal"></div>
+    <div id="roomModal" class="modal"></div>
+    
+    <script>
+        const API = window.location.origin + '/api';
+        window.app = { user: null, currentRoom: null, rooms: [], isDarkMode: true };
+        let mediaRecorder = null;
+        let audioChunks = [];
+        let isRecording = false;
+        
+        async function api(endpoint, method = 'GET', body = null) {
+            const opts = { method, headers: { 'Content-Type': 'application/json' } };
+            if (body) opts.body = JSON.stringify(body);
+            return (await fetch(API + endpoint, opts)).json();
+        }
+
+        function init() {
+            const saved = localStorage.getItem('user');
+            if (saved) { app.user = JSON.parse(saved); renderMain(); sync(); } 
+            else renderSetup();
+        }
+
+        function renderSetup() {
+            const m = document.getElementById('setupModal');
+            m.innerHTML = `
+                <div class="modal-content">
+                    <h2>Welcome to ChatApp</h2>
+                    <input type="text" id="name" placeholder="Full Name">
+                    <input type="email" id="email" placeholder="Email">
+                    <input type="tel" id="phone" placeholder="Phone Number">
+                    <div class="modal-buttons"><button onclick="saveUser()">Continue</button></div>
+                </div>`;
+            m.classList.add('show');
+        }
+
+        async function saveUser() {
+            const data = { name: document.getElementById('name').value, email: document.getElementById('email').value, phone: document.getElementById('phone').value };
+            if (!data.name || !data.email) return alert('Name and Email required');
+            const res = await api('/init-user', 'POST', data);
+            app.user = res.user;
+            localStorage.setItem('user', JSON.stringify(app.user));
+            document.getElementById('setupModal').classList.remove('show');
+            renderMain(); sync();
+        }
+
+        function renderMain() {
+            document.getElementById('app').innerHTML = `
+                <div class="container">
+                    <div class="sidebar">
+                        <div class="sidebar-header">
+                            <h2>Rooms</h2>
+                            <div class="user-info">${app.user.name} | ${app.user.email}</div>
+                        </div>
+                        <div class="action-buttons">
+                            <button onclick="showRoomModal('create')">Create Room</button>
+                            <button class="secondary" onclick="showRoomModal('join')">Join Room</button>
+                        </div>
+                        <div class="rooms-list" id="roomsList"></div>
+                    </div>
+                    <div class="main" id="mainArea">
+                        <div style="padding:40px;text-align:center;color:#666;">Select a room to chat</div>
+                    </div>
+                </div>`;
+            updateRooms();
+        }
+
+        async function updateRooms() {
+            const res = await api('/rooms/' + app.user.email);
+            app.rooms = res.rooms || [];
+            document.getElementById('roomsList').innerHTML = app.rooms.map(r => `
+                <div class="room-item ${app.currentRoom?._id === r._id ? 'active' : ''}" onclick="selectRoom('${r._id}')">
+                    <strong>🔒 ${r.roomName}</strong> <br> <small>${r.members.length} members</small>
+                </div>
+            `).join('');
+        }
+
+        async function selectRoom(id) {
+            app.currentRoom = app.rooms.find(r => r._id === id);
+            document.getElementById('mainArea').innerHTML = `
+                <div class="chat-header"><h3>${app.currentRoom.roomName}</h3></div>
+                <div class="messages-area" id="msgs"></div>
+                <div class="input-section">
+                    <button class="media-btn" onclick="document.getElementById('imgInput').click()">📸</button>
+                    <input type="file" id="imgInput" accept="image/*" style="display:none" onchange="uploadImage(this)">
+                    <button id="voiceBtn" class="media-btn" onclick="toggleVoice()">🎙️</button>
+                    <input type="text" id="msgInput" placeholder="Type message...">
+                    <button onclick="sendMsg()">Send</button>
+                </div>`;
+            updateMsgs();
+        }
+
+        async function updateMsgs() {
+            if (!app.currentRoom) return;
+            const res = await api('/messages/' + app.currentRoom._id);
+            const msgs = res.messages || [];
+            const box = document.getElementById('msgs');
+            box.innerHTML = msgs.map(m => {
+                const isMe = m.sender === app.user.email;
+                let contentHTML = '';
+                
+                if (m.type === 'image') {
+                    contentHTML = `<img class="chat-img" src="${m.text}" alt="Shared Image">`;
+                } else if (m.type === 'voice') {
+                    contentHTML = `<audio controls src="${m.text}"></audio>`;
+                } else {
+                    contentHTML = `<div class="message-bubble">${m.text}</div>`;
+                }
+
+                return `<div class="message ${isMe ? 'sent' : 'received'}">
+                    <div class="message-content">
+                        ${!isMe ? `<div class="message-user">${m.senderName}</div>` : ''}
+                        ${contentHTML}
+                    </div>
+                </div>`;
+            }).join('');
+            box.scrollTop = box.scrollHeight;
+        }
+
+        async function sendMsg() {
+            const input = document.getElementById('msgInput');
+            if (!input.value.trim()) return;
+            await api('/send-message', 'POST', { roomId: app.currentRoom._id, sender: app.user.email, senderName: app.user.name, text: input.value, type: 'text' });
+            input.value = ''; updateMsgs();
+        }
+
+        async function uploadImage(input) {
+            if (!input.files || !input.files[0]) return;
+            const reader = new FileReader();
+            reader.onload = async function (e) {
+                await api('/send-message', 'POST', { roomId: app.currentRoom._id, sender: app.user.email, senderName: app.user.name, text: e.target.result, type: 'image' });
+                updateMsgs();
+            };
+            reader.readAsDataURL(input.files[0]);
+        }
+
+        async function toggleVoice() {
+            const btn = document.getElementById('voiceBtn');
+            if (!isRecording) {
+                try {
+                    const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+                    mediaRecorder = new MediaRecorder(stream);
+                    audioChunks = [];
+                    
+                    mediaRecorder.ondataavailable = e => audioChunks.push(e.data);
+                    mediaRecorder.onstop = async () => {
+                        const audioBlob = new Blob(audioChunks, { type: 'audio/mp3' });
+                        const reader = new FileReader();
+                        reader.onloadend = async () => {
+                            await api('/send-message', 'POST', { roomId: app.currentRoom._id, sender: app.user.email, senderName: app.user.name, text: reader.result, type: 'voice' });
+                            updateMsgs();
+                        };
+                        reader.readAsDataURL(audioBlob);
+                        stream.getTracks().forEach(track => track.stop());
+                    };
+                    
+                    mediaRecorder.start();
+                    isRecording = true;
+                    btn.innerText = '🛑';
+                    btn.classList.add('voice-recording');
+                } catch (err) {
+                    alert('Microphone access denied or unsupported.');
+                }
+            } else {
+                mediaRecorder.stop();
+                isRecording = false;
+                btn.innerText = '🎙️';
+                btn.classList.remove('voice-recording');
+            }
+        }
+
+        function showRoomModal(type) {
+            const m = document.getElementById('roomModal');
+            const isCreate = type === 'create';
+            m.innerHTML = `
+                <div class="modal-content">
+                    <h2>${isCreate ? 'Create' : 'Join'} Room</h2>
+                    <input type="text" id="roomInput" placeholder="${isCreate ? 'Room Name' : 'Room ID'}">
+                    <div class="modal-buttons">
+                        <button onclick="${isCreate ? 'createRoom()' : 'joinRoom()'}">${isCreate ? 'Create' : 'Join'}</button>
+                        <button class="secondary" onclick="document.getElementById('roomModal').classList.remove('show')">Cancel</button>
+                    </div>
+                </div>`;
+            m.classList.add('show');
+        }
+
+        async function createRoom() {
+            const name = document.getElementById('roomInput').value;
+            const res = await api('/create-room', 'POST', { creator: app.user.email, roomName: name });
+            alert('Room ID: ' + res.roomId);
+            document.getElementById('roomModal').classList.remove('show');
+            updateRooms();
+        }
+
+        async function joinRoom() {
+            const id = document.getElementById('roomInput').value;
+            await api('/join-room', 'POST', { email: app.user.email, roomId: id });
+            document.getElementById('roomModal').classList.remove('show');
+            updateRooms();
+        }
+
+        function sync() { setInterval(() => { app.currentRoom ? updateMsgs() : updateRooms(); }, 2000); }
+        
+        init();
+    </script>
+</body>
+</html>
