@@ -1,15 +1,13 @@
-require('dotenv').config();
 const http = require('http');
 const url = require('url');
-const querystring = require('querystring');
 const { MongoClient, ObjectId } = require('mongodb');
- 
+
 const mongoUri = process.env.MONGO_URI;
 if (!mongoUri) {
     console.error("❌ ERROR: MONGO_URI environment variable is missing!");
     process.exit(1);
 }
- 
+
 const client = new MongoClient(mongoUri, {
     maxPoolSize: 10,
     minPoolSize: 2,
@@ -17,9 +15,9 @@ const client = new MongoClient(mongoUri, {
     connectTimeoutMS: 10000,
     socketTimeoutMS: 45000
 });
- 
-let db, usersCollection, roomsCollection, messagesCollection, reactionsCollection, pinsCollection;
- 
+
+let db, usersCollection, roomsCollection, messagesCollection;
+
 async function connectDB() {
     try {
         await client.connect();
@@ -27,14 +25,10 @@ async function connectDB() {
         usersCollection = db.collection('users');
         roomsCollection = db.collection('rooms');
         messagesCollection = db.collection('messages');
-        reactionsCollection = db.collection('reactions');
-        pinsCollection = db.collection('pins');
         
-        // Create indexes for better performance
         await usersCollection.createIndex({ email: 1 });
         await usersCollection.createIndex({ phone: 1 });
         await roomsCollection.createIndex({ roomId: 1 });
-        await roomsCollection.createIndex({ creator: 1 });
         await messagesCollection.createIndex({ roomId: 1, timestamp: 1 });
         
         console.log("✅ Successfully connected to MongoDB!");
@@ -43,13 +37,11 @@ async function connectDB() {
         process.exit(1);
     }
 }
- 
-// Helper: Generate room ID
+
 function generateRoomId() {
     return 'ROOM-' + Math.random().toString(36).substr(2, 9).toUpperCase();
 }
- 
-// Helper: Parse JSON safely
+
 function parseJSON(str) {
     try {
         return JSON.parse(str);
@@ -57,8 +49,8 @@ function parseJSON(str) {
         return null;
     }
 }
- 
-const html = /* html */ `<!DOCTYPE html>
+
+const html = `<!DOCTYPE html>
 <html lang="en">
 <head>
     <meta charset="UTF-8">
@@ -126,11 +118,10 @@ const html = /* html */ `<!DOCTYPE html>
         .message { display: flex; margin-bottom: 4px; }
         .message.sent { justify-content: flex-end; }
         .message.received { justify-content: flex-start; }
-        .message-bubble { max-width: 60%; padding: 10px 14px; border-radius: 14px; word-wrap: break-word; font-size: 14px; line-height: 1.4; position: relative; }
+        .message-bubble { max-width: 60%; padding: 10px 14px; border-radius: 14px; word-wrap: break-word; font-size: 14px; line-height: 1.4; }
         .message.sent .message-bubble { background: var(--primary); color: white; }
         .message.received .message-bubble { background: var(--dark-border); color: var(--text-primary); }
         .message-user { font-size: 11px; font-weight: 600; margin-bottom: 4px; color: var(--accent); }
-        .message-image { max-width: 200px; border-radius: 8px; margin-top: 4px; cursor: pointer; }
         .message-time { font-size: 10px; color: var(--text-secondary); margin-top: 4px; }
         
         .input-section { padding: 12px 16px; border-top: 1px solid var(--dark-border); display: flex; gap: 8px; align-items: center; }
@@ -151,26 +142,19 @@ const html = /* html */ `<!DOCTYPE html>
         .placeholder { display: flex; align-items: center; justify-content: center; height: 100%; color: var(--text-secondary); font-size: 16px; }
         .empty-state { padding: 40px 20px; text-align: center; color: var(--text-secondary); }
         
-        .room-settings-btn { background: none; border: none; font-size: 18px; cursor: pointer; color: var(--text-primary); }
-        .admin-badge { background: var(--accent); color: white; padding: 2px 6px; border-radius: 4px; font-size: 10px; font-weight: 600; margin-left: 8px; }
-        
         @media (max-width: 768px) {
             .sidebar { width: 100%; position: absolute; left: 0; top: 0; height: 100%; transform: translateX(-100%); transition: transform 0.3s; z-index: 100; }
-            .container.show-chat .sidebar { transform: translateX(-100%); }
-            .container.show-chat .main { width: 100%; }
-            .chat-header-left .back-btn { display: block; background: none; border: none; font-size: 20px; cursor: pointer; color: var(--primary); }
+            .main { width: 100%; }
         }
     </style>
 </head>
 <body>
     <div id="app"></div>
     
-    <!-- Modals -->
     <div id="setupModal" class="modal show"></div>
     <div id="roomCreateModal" class="modal"></div>
     <div id="roomJoinModal" class="modal"></div>
     <div id="settingsModal" class="modal"></div>
-    <div id="imageViewerModal" class="modal"></div>
     
     <script>
         const API = window.location.origin + '/api';
@@ -183,7 +167,6 @@ const html = /* html */ `<!DOCTYPE html>
             isDarkMode: true
         };
         
-        // Utility Functions
         window.generateColor = (str) => {
             const colors = ['#FF6B6B', '#4ECDC4', '#45B7D1', '#FFA07A', '#98D8C8', '#F7DC6F'];
             let hash = 0;
@@ -198,7 +181,6 @@ const html = /* html */ `<!DOCTYPE html>
             return date.getHours().toString().padStart(2, '0') + ':' + date.getMinutes().toString().padStart(2, '0');
         };
         
-        // API Calls
         window.initUser = async (name, email, phone) => {
             try {
                 const res = await fetch(API + '/init-user', {
@@ -275,33 +257,9 @@ const html = /* html */ `<!DOCTYPE html>
             }
         };
         
-        window.addReaction = async (messageId, emoji) => {
-            try {
-                const res = await fetch(API + '/add-reaction', {
-                    method: 'POST',
-                    headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify({ messageId, emoji, user: window.app.user.email })
-                });
-                return await res.json();
-            } catch (e) {
-                return { error: 'Failed' };
-            }
-        };
-        
-        // UI Rendering
         window.renderSetupScreen = () => {
             const modal = document.getElementById('setupModal');
-            modal.innerHTML = \`
-                <div class="modal-content" style="max-width: 350px;">
-                    <h2>Welcome to ChatApp 🎮</h2>
-                    <input type="text" id="setupName" placeholder="Full Name" />
-                    <input type="email" id="setupEmail" placeholder="Email" />
-                    <input type="tel" id="setupPhone" placeholder="Phone Number" />
-                    <div class="modal-buttons">
-                        <button class="primary" onclick="window.handleSetup()">Continue</button>
-                    </div>
-                </div>
-            \`;
+            modal.innerHTML = '<div class="modal-content" style="max-width: 350px;"><h2>Welcome to ChatApp</h2><input type="text" id="setupName" placeholder="Full Name" /><input type="email" id="setupEmail" placeholder="Email" /><input type="tel" id="setupPhone" placeholder="Phone Number" /><div class="modal-buttons"><button class="primary" onclick="window.handleSetup()">Continue</button></div></div>';
             modal.classList.add('show');
         };
         
@@ -330,28 +288,7 @@ const html = /* html */ `<!DOCTYPE html>
         
         window.renderMain = () => {
             const app = document.getElementById('app');
-            app.innerHTML = \`
-                <div class="container" id="container">
-                    <div class="sidebar">
-                        <div class="sidebar-header">
-                            <h2>Rooms</h2>
-                            <div class="user-info">👤 \${window.app.user.name}<br>📧 \${window.app.user.email}</div>
-                        </div>
-                        <div class="action-buttons">
-                            <button onclick="window.showCreateRoomModal()">+ Create</button>
-                            <button class="secondary" onclick="window.showJoinRoomModal()">🔓 Join</button>
-                        </div>
-                        <div class="rooms-list" id="roomsList"></div>
-                        <div class="sidebar-footer">
-                            <button onclick="window.chatWithCreator()">💬 Creator</button>
-                            <button onclick="window.showSettingsModal()">⚙️ Settings</button>
-                        </div>
-                    </div>
-                    <div class="main" id="mainArea">
-                        <div class="placeholder">Select a room to start chatting</div>
-                    </div>
-                </div>
-            \`;
+            app.innerHTML = '<div class="container" id="container"><div class="sidebar"><div class="sidebar-header"><h2>Rooms</h2><div class="user-info">👤 ' + window.app.user.name + '<br>📧 ' + window.app.user.email + '</div></div><div class="action-buttons"><button onclick="window.showCreateRoomModal()">+ Create</button><button class="secondary" onclick="window.showJoinRoomModal()">Join</button></div><div class="rooms-list" id="roomsList"></div><div class="sidebar-footer"><button onclick="window.chatWithCreator()">Creator</button><button onclick="window.showSettingsModal()">Settings</button></div></div><div class="main" id="mainArea"><div class="placeholder">Select a room to start chatting</div></div></div>';
             window.updateRoomsList();
         };
         
@@ -366,17 +303,7 @@ const html = /* html */ `<!DOCTYPE html>
             
             roomsList.innerHTML = data.rooms.map(room => {
                 const isActive = window.app.currentRoom && window.app.currentRoom._id === room._id ? 'active' : '';
-                return \`
-                    <div class="room-item \${isActive}" onclick="window.selectRoom('\${room._id}')">
-                        <div style="display: flex; align-items: center;">
-                            <span style="font-size: 18px; margin-right: 8px;">🔒</span>
-                            <div style="flex: 1;">
-                                <div class="room-item-name">\${room.roomName}\${room.creator === window.app.user.email ? '<span class="admin-badge">ADMIN</span>' : ''}</div>
-                                <div class="room-item-info">\${room.members ? room.members.length : 0} members</div>
-                            </div>
-                        </div>
-                    </div>
-                \`;
+                return '<div class="room-item ' + isActive + '" onclick="window.selectRoom(\'' + room._id + '\')"><div style="display: flex; align-items: center;"><span style="font-size: 18px; margin-right: 8px;">🔒</span><div style="flex: 1;"><div class="room-item-name">' + room.roomName + '</div><div class="room-item-info">' + (room.members ? room.members.length : 0) + ' members</div></div></div></div>';
             }).join('');
         };
         
@@ -387,30 +314,9 @@ const html = /* html */ `<!DOCTYPE html>
             if (!window.app.currentRoom) return;
             
             const mainArea = document.getElementById('mainArea');
-            mainArea.innerHTML = \`
-                <div class="chat-header">
-                    <div class="chat-header-left">
-                        <button class="back-btn" onclick="window.deselectRoom()">←</button>
-                        <div class="chat-header-info">
-                            <h2>\${window.app.currentRoom.roomName}</h2>
-                            <p>\${window.app.currentRoom.members.length} members • \${window.app.currentRoom.isPrivate ? '🔒 Private' : '🔓 Public'}</p>
-                        </div>
-                    </div>
-                    <div class="chat-header-right">
-                        \${window.app.currentRoom.creator === window.app.user.email ? '<button onclick="window.showRoomSettings()" class="room-settings-btn">⚙️</button>' : ''}
-                    </div>
-                </div>
-                <div class="messages-area" id="messagesArea"></div>
-                <div class="input-section">
-                    <button id="voiceBtn" onclick="window.recordVoice()" style="background: none; border: none; font-size: 20px; cursor: pointer;">🎤</button>
-                    <input type="file" id="imageInput" accept="image/*" style="display: none;" onchange="window.handleImageSelect()" />
-                    <button onclick="document.getElementById('imageInput').click()" style="background: none; border: none; font-size: 20px; cursor: pointer;">📸</button>
-                    <input type="text" id="messageInput" placeholder="Type a message..." />
-                    <button onclick="window.handleSendMessage()">Send</button>
-                </div>
-            \`;
+            mainArea.innerHTML = '<div class="chat-header"><div class="chat-header-left"><div class="chat-header-info"><h2>' + window.app.currentRoom.roomName + '</h2><p>' + window.app.currentRoom.members.length + ' members</p></div></div></div><div class="messages-area" id="messagesArea"></div><div class="input-section"><input type="text" id="messageInput" placeholder="Type a message..." /><button onclick="window.handleSendMessage()">Send</button></div>';
             
-            document.getElementById('messageInput')?.focus();
+            document.getElementById('messageInput').focus();
             await window.updateMessages();
         };
         
@@ -429,24 +335,7 @@ const html = /* html */ `<!DOCTYPE html>
                 const isOwn = msg.sender === window.app.user.email;
                 const isSent = isOwn ? 'sent' : 'received';
                 
-                let content = '';
-                if (msg.type === 'text') {
-                    content = \`<div class="message-bubble">\${msg.text}</div>\`;
-                } else if (msg.type === 'image') {
-                    content = \`<img src="\${msg.text}" class="message-image" onclick="window.viewImage('\${msg.text}')" />\`;
-                } else if (msg.type === 'audio') {
-                    content = \`<audio src="\${msg.text}" controls style="max-width: 200px; margin-top: 4px;"></audio>\`;
-                }
-                
-                return \`
-                    <div class="message \${isSent}">
-                        <div class="message-content">
-                            \${!isOwn ? '<div class="message-user">' + msg.senderName + '</div>' : ''}
-                            \${content}
-                            <div class="message-time">\${window.formatTime(msg.timestamp)}</div>
-                        </div>
-                    </div>
-                \`;
+                return '<div class="message ' + isSent + '"><div class="message-content">' + (!isOwn ? '<div class="message-user">' + msg.senderName + '</div>' : '') + '<div class="message-bubble">' + msg.text + '</div><div class="message-time">' + window.formatTime(msg.timestamp) + '</div></div></div>';
             }).join('');
             
             messagesArea.scrollTop = messagesArea.scrollHeight;
@@ -464,61 +353,15 @@ const html = /* html */ `<!DOCTYPE html>
             await window.updateMessages();
         };
         
-        window.handleImageSelect = async () => {
-            const file = document.getElementById('imageInput').files[0];
-            if (!file) return;
-            
-            const reader = new FileReader();
-            reader.onload = async (e) => {
-                await window.sendMessage(window.app.currentRoom._id, e.target.result, 'image');
-                document.getElementById('imageInput').value = '';
-                await window.updateMessages();
-            };
-            reader.readAsDataURL(file);
-        };
-        
-        window.viewImage = (src) => {
-            const modal = document.getElementById('imageViewerModal');
-            modal.innerHTML = \`
-                <div style="max-width: 90%; max-height: 90%;">
-                    <img src="\${src}" style="max-width: 100%; max-height: 100%; border-radius: 8px;" />
-                </div>
-            \`;
-            modal.classList.add('show');
-            modal.onclick = () => modal.classList.remove('show');
-        };
-        
         window.showCreateRoomModal = () => {
             const modal = document.getElementById('roomCreateModal');
-            modal.innerHTML = \`
-                <div class="modal-content">
-                    <h2>Create Room</h2>
-                    <label style="font-size: 12px; color: var(--text-secondary); margin-bottom: 8px; display: block;">Room Type</label>
-                    <select id="roomType" style="margin-bottom: 12px;">
-                        <option value="named">Custom Name</option>
-                        <option value="auto">Auto Generate ID</option>
-                    </select>
-                    <input type="text" id="roomName" placeholder="Room name (if custom)" />
-                    <label>
-                        <input type="checkbox" id="isPrivate" checked /> Private Room
-                    </label>
-                    <div class="modal-buttons" style="margin-top: 16px;">
-                        <button class="primary" onclick="window.handleCreateRoom()">Create</button>
-                        <button class="secondary" onclick="document.getElementById('roomCreateModal').classList.remove('show')">Cancel</button>
-                    </div>
-                </div>
-            \`;
+            modal.innerHTML = '<div class="modal-content"><h2>Create Room</h2><input type="text" id="roomName" placeholder="Room name" /><label><input type="checkbox" id="isPrivate" checked /> Private Room</label><div class="modal-buttons"><button class="primary" onclick="window.handleCreateRoom()">Create</button><button class="secondary" onclick="document.getElementById(\'roomCreateModal\').classList.remove(\'show\')">Cancel</button></div></div>';
             modal.classList.add('show');
         };
         
         window.handleCreateRoom = async () => {
-            const type = document.getElementById('roomType').value;
+            const roomName = document.getElementById('roomName').value.trim();
             const isPrivate = document.getElementById('isPrivate').checked;
-            let roomName = document.getElementById('roomName').value.trim();
-            
-            if (type === 'auto') {
-                roomName = 'Room ' + Math.random().toString(36).substr(2, 5).toUpperCase();
-            }
             
             if (!roomName) {
                 alert('Enter room name');
@@ -537,16 +380,7 @@ const html = /* html */ `<!DOCTYPE html>
         
         window.showJoinRoomModal = () => {
             const modal = document.getElementById('roomJoinModal');
-            modal.innerHTML = \`
-                <div class="modal-content">
-                    <h2>Join Room</h2>
-                    <input type="text" id="joinRoomId" placeholder="Enter Room ID (e.g., ROOM-ABC123)" />
-                    <div class="modal-buttons">
-                        <button class="primary" onclick="window.handleJoinRoom()">Join</button>
-                        <button class="secondary" onclick="document.getElementById('roomJoinModal').classList.remove('show')">Cancel</button>
-                    </div>
-                </div>
-            \`;
+            modal.innerHTML = '<div class="modal-content"><h2>Join Room</h2><input type="text" id="joinRoomId" placeholder="Enter Room ID (e.g., ROOM-ABC123)" /><div class="modal-buttons"><button class="primary" onclick="window.handleJoinRoom()">Join</button><button class="secondary" onclick="document.getElementById(\'roomJoinModal\').classList.remove(\'show\')">Cancel</button></div></div>';
             modal.classList.add('show');
         };
         
@@ -568,27 +402,12 @@ const html = /* html */ `<!DOCTYPE html>
         };
         
         window.chatWithCreator = () => {
-            alert('Chat with Creator feature:\n📞 +94 782 721 294\n\nDirect chat available soon!');
+            alert('Chat with Creator: +94 782 721 294');
         };
         
         window.showSettingsModal = () => {
             const modal = document.getElementById('settingsModal');
-            modal.innerHTML = \`
-                <div class="modal-content">
-                    <h2>Settings ⚙️</h2>
-                    <h3 style="margin-top: 16px; margin-bottom: 8px;">Theme</h3>
-                    <button onclick="window.toggleTheme()" style="width: 100%; padding: 10px; background: var(--primary); color: white; border: none; border-radius: 8px; cursor: pointer;">
-                        \${window.app.isDarkMode ? '☀️ Light Mode' : '🌙 Dark Mode'}
-                    </button>
-                    <h3 style="margin-top: 16px; margin-bottom: 8px;">Profile</h3>
-                    <p style="font-size: 12px; color: var(--text-secondary);">Name: \${window.app.user.name}</p>
-                    <p style="font-size: 12px; color: var(--text-secondary);">Email: \${window.app.user.email}</p>
-                    <p style="font-size: 12px; color: var(--text-secondary);">Phone: \${window.app.user.phone}</p>
-                    <div class="modal-buttons" style="margin-top: 16px;">
-                        <button class="secondary" onclick="document.getElementById('settingsModal').classList.remove('show')">Close</button>
-                    </div>
-                </div>
-            \`;
+            modal.innerHTML = '<div class="modal-content"><h2>Settings</h2><h3 style="margin-top: 16px;">Theme</h3><button onclick="window.toggleTheme()" style="width: 100%; padding: 10px; background: var(--primary); color: white; border: none; border-radius: 8px; cursor: pointer;">' + (window.app.isDarkMode ? 'Light Mode' : 'Dark Mode') + '</button><h3 style="margin-top: 16px;">Profile</h3><p style="font-size: 12px;">Name: ' + window.app.user.name + '</p><p style="font-size: 12px;">Email: ' + window.app.user.email + '</p><div class="modal-buttons"><button class="secondary" onclick="document.getElementById(\'settingsModal\').classList.remove(\'show\')">Close</button></div></div>';
             modal.classList.add('show');
         };
         
@@ -597,11 +416,6 @@ const html = /* html */ `<!DOCTYPE html>
             document.body.classList.toggle('light-mode');
             localStorage.setItem('chatAppTheme', window.app.isDarkMode ? 'dark' : 'light');
             window.showSettingsModal();
-        };
-        
-        window.deselectRoom = () => {
-            window.app.currentRoom = null;
-            window.renderMain();
         };
         
         window.startSync = () => {
@@ -615,7 +429,6 @@ const html = /* html */ `<!DOCTYPE html>
             }, 2000);
         };
         
-        // Initialize
         const saved = localStorage.getItem('chatAppUser');
         if (saved) {
             window.app.user = JSON.parse(saved);
@@ -633,7 +446,7 @@ const html = /* html */ `<!DOCTYPE html>
     </script>
 </body>
 </html>`;
- 
+
 const server = http.createServer(async (req, res) => {
     const parsedUrl = url.parse(req.url, true);
     const pathname = parsedUrl.pathname;
@@ -650,13 +463,12 @@ const server = http.createServer(async (req, res) => {
     }
     
     if (pathname === '/' && req.method === 'GET') {
-        res.setHeader('Content-Type', 'text/html');
+        res.setHeader('Content-Type', 'text/html; charset=utf-8');
         res.writeHead(200);
         res.end(html);
         return;
     }
     
-    // API Routes
     if (pathname === '/api/init-user' && req.method === 'POST') {
         let body = '';
         req.on('data', chunk => body += chunk);
@@ -674,10 +486,9 @@ const server = http.createServer(async (req, res) => {
                     const result = await usersCollection.insertOne({
                         name, email, phone,
                         bio: '',
-                        hidePhone: false,
                         createdAt: new Date()
                     });
-                    user = { _id: result.insertedId, name, email, phone, bio: '', hidePhone: false };
+                    user = { _id: result.insertedId, name, email, phone, bio: '' };
                 }
                 
                 res.writeHead(200);
@@ -706,8 +517,7 @@ const server = http.createServer(async (req, res) => {
                 const result = await roomsCollection.insertOne({
                     roomId, roomName, creator, isPrivate,
                     members: [creator],
-                    createdAt: new Date(),
-                    settings: { allowPinning: true, allowMentions: true }
+                    createdAt: new Date()
                 });
                 
                 res.writeHead(200);
@@ -778,8 +588,7 @@ const server = http.createServer(async (req, res) => {
                 
                 const result = await messagesCollection.insertOne({
                     roomId, sender, senderName, text, type: type || 'text',
-                    timestamp: Date.now(),
-                    reactions: []
+                    timestamp: Date.now()
                 });
                 
                 res.writeHead(200);
@@ -808,15 +617,14 @@ const server = http.createServer(async (req, res) => {
     res.writeHead(404);
     res.end(JSON.stringify({ error: 'Not found' }));
 });
- 
+
 const PORT = process.env.PORT || 3000;
- 
+
 async function startServer() {
     await connectDB();
     server.listen(PORT, '0.0.0.0', () => {
         console.log(`✅ ChatApp server running on port ${PORT}`);
     });
 }
- 
+
 startServer();
- 
