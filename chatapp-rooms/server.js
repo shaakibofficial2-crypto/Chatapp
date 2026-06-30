@@ -3,7 +3,7 @@ const http = require('http');
 const url = require('url');
 const fs = require('fs');
 const path = require('path');
-const { MongoClient } = require('mongodb');
+const { MongoClient, ObjectId } = require('mongodb');
 
 const mongoUri = process.env.MONGO_URI;
 if (!mongoUri) {
@@ -11,9 +11,8 @@ if (!mongoUri) {
     process.exit(1);
 }
 
-// Increased maxPoolSize slightly to allow smooth binary chunk operations
 const client = new MongoClient(mongoUri, { maxPoolSize: 15 });
-let db, usersCollection, roomsCollection, messagesCollection;
+let db, usersCollection, roomsCollection, messagesCollection, reportsCollection;
 
 async function connectDB() {
     try {
@@ -22,7 +21,8 @@ async function connectDB() {
         usersCollection = db.collection('users');
         roomsCollection = db.collection('rooms');
         messagesCollection = db.collection('messages');
-        console.log("✅ Successfully connected to MongoDB!");
+        reportsCollection = db.collection('reports');
+        console.log("✅ Successfully connected to MongoDB Collections!");
     } catch (err) {
         console.error("❌ MongoDB connection failed:", err);
         process.exit(1);
@@ -57,37 +57,98 @@ const server = http.createServer(async (req, res) => {
         }
     }
     
+    // Initialize User Profile Setup
     if (pathname === '/api/init-user' && req.method === 'POST') {
         let body = ''; req.on('data', c => body += c);
         req.on('end', async () => {
-            const { name, email, phone } = parseJSON(body);
+            const { name, email, avatar, isPrivate } = parseJSON(body);
             let user = await usersCollection.findOne({ email });
             if (!user) {
-                const result = await usersCollection.insertOne({ name, email, phone, createdAt: new Date() });
-                user = { _id: result.insertedId, name, email, phone };
+                const result = await usersCollection.insertOne({ name, email, avatar: avatar || '', isPrivate: isPrivate || false, createdAt: new Date() });
+                user = { _id: result.insertedId, name, email, avatar, isPrivate };
             }
             res.writeHead(200).end(JSON.stringify({ success: true, user }));
         });
         return;
     }
+
+    // Real-Time Update Profile (Name, Avatar, Privacy)
+    if (pathname === '/api/update-profile' && req.method === 'POST') {
+        let body = ''; req.on('data', c => body += c);
+        req.on('end', async () => {
+            const { email, name, avatar, isPrivate } = parseJSON(body);
+            await usersCollection.updateOne({ email }, { $set: { name, avatar, isPrivate } });
+            res.writeHead(200).end(JSON.stringify({ success: true }));
+        });
+        return;
+    }
+
+    // Submit Direct Issue Report
+    if (pathname === '/api/submit-report' && req.method === 'POST') {
+        let body = ''; req.on('data', c => body += c);
+        req.on('end', async () => {
+            const reportData = parseJSON(body);
+            reportData.timestamp = new Date();
+            await reportsCollection.insertOne(reportData);
+            res.writeHead(200).end(JSON.stringify({ success: true }));
+        });
+        return;
+    }
     
+    // Create Room with Invite permissions by default
     if (pathname === '/api/create-room' && req.method === 'POST') {
         let body = ''; req.on('data', c => body += c);
         req.on('end', async () => {
             const { creator, roomName } = parseJSON(body);
             const roomId = generateRoomId();
-            await roomsCollection.insertOne({ roomId, roomName, creator, members: [creator], createdAt: new Date() });
+            await roomsCollection.insertOne({ roomId, roomName, creator, members: [creator], allowInvites: true, createdAt: new Date() });
             res.writeHead(200).end(JSON.stringify({ success: true, roomId }));
         });
         return;
     }
+
+    // Dynamic configuration modifier for invites
+    if (pathname === '/api/room-allow-invites' && req.method === 'POST') {
+        let body = ''; req.on('data', c => body += c);
+        req.on('end', async () => {
+            const { roomId, allowInvites } = parseJSON(body);
+            await roomsCollection.updateOne({ _id: new ObjectId(roomId) }, { $set: { allowInvites } });
+            res.writeHead(200).end(JSON.stringify({ success: true }));
+        });
+        return;
+    }
     
+    // Join Group validation logic checking restrictions
     if (pathname === '/api/join-room' && req.method === 'POST') {
         let body = ''; req.on('data', c => body += c);
         req.on('end', async () => {
             const { email, roomId } = parseJSON(body);
+            const targetRoom = await roomsCollection.findOne({ roomId });
+            if (!targetRoom) {
+                return res.writeHead(200).end(JSON.stringify({ error: 'Room does not exist' }));
+            }
+            if (!targetRoom.allowInvites && targetRoom.creator !== email) {
+                return res.writeHead(200).end(JSON.stringify({ error: 'Room joins are currently locked by owner' }));
+            }
             await roomsCollection.updateOne({ roomId }, { $addToSet: { members: email } });
             res.writeHead(200).end(JSON.stringify({ success: true }));
+        });
+        return;
+    }
+
+    // Permanent Group deletion endpoint
+    if (pathname === '/api/delete-room' && req.method === 'POST') {
+        let body = ''; req.on('data', c => body += c);
+        req.on('end', async () => {
+            const { id, email } = parseJSON(body);
+            const room = await roomsCollection.findOne({ _id: new ObjectId(id) });
+            if (room && room.creator === email) {
+                await messagesCollection.deleteMany({ roomId: id });
+                await roomsCollection.deleteOne({ _id: new ObjectId(id) });
+                res.writeHead(200).end(JSON.stringify({ success: true }));
+            } else {
+                res.writeHead(403).end(JSON.stringify({ error: 'Unauthorized deletion request' }));
+            }
         });
         return;
     }
@@ -103,7 +164,6 @@ const server = http.createServer(async (req, res) => {
         req.on('end', async () => {
             const data = parseJSON(body);
             if (!data) return res.writeHead(400).end(JSON.stringify({ error: 'Invalid JSON payload' }));
-            
             data.timestamp = Date.now();
             await messagesCollection.insertOne(data);
             res.writeHead(200).end(JSON.stringify({ success: true }));
