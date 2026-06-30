@@ -37,6 +37,15 @@ function parseJSON(str) {
     try { return JSON.parse(str); } catch { return null; }
 }
 
+// Safely converts a string to a MongoDB ObjectId without crashing the server
+function safelyGetObjectId(id) {
+    try {
+        return ObjectId.isValid(id) ? new ObjectId(id) : null;
+    } catch (e) {
+        return null;
+    }
+}
+
 const server = http.createServer(async (req, res) => {
     const parsedUrl = url.parse(req.url, true);
     const pathname = parsedUrl.pathname;
@@ -88,8 +97,10 @@ const server = http.createServer(async (req, res) => {
         let body = ''; req.on('data', c => body += c);
         req.on('end', async () => {
             const reportData = parseJSON(body);
-            reportData.timestamp = new Date();
-            await reportsCollection.insertOne(reportData);
+            if (reportData) {
+                reportData.timestamp = new Date();
+                await reportsCollection.insertOne(reportData);
+            }
             res.writeHead(200).end(JSON.stringify({ success: true }));
         });
         return;
@@ -112,7 +123,13 @@ const server = http.createServer(async (req, res) => {
         let body = ''; req.on('data', c => body += c);
         req.on('end', async () => {
             const { roomId, allowInvites } = parseJSON(body);
-            await roomsCollection.updateOne({ _id: new ObjectId(roomId) }, { $set: { allowInvites } });
+            const objId = safelyGetObjectId(roomId);
+            
+            if (!objId) {
+                return res.writeHead(400).end(JSON.stringify({ error: 'Invalid Room Identification format' }));
+            }
+            
+            await roomsCollection.updateOne({ _id: objId }, { $set: { allowInvites } });
             res.writeHead(200).end(JSON.stringify({ success: true }));
         });
         return;
@@ -141,10 +158,17 @@ const server = http.createServer(async (req, res) => {
         let body = ''; req.on('data', c => body += c);
         req.on('end', async () => {
             const { id, email } = parseJSON(body);
-            const room = await roomsCollection.findOne({ _id: new ObjectId(id) });
+            const objId = safelyGetObjectId(id);
+            
+            if (!objId) {
+                return res.writeHead(400).end(JSON.stringify({ error: 'Invalid Room reference mapping' }));
+            }
+
+            const room = await roomsCollection.findOne({ _id: objId });
             if (room && room.creator === email) {
-                await messagesCollection.deleteMany({ roomId: id });
-                await roomsCollection.deleteOne({ _id: new ObjectId(id) });
+                // Wipe history messages tied to this space ID as both raw text and mapped ObjectId values
+                await messagesCollection.deleteMany({ $or: [{ roomId: id }, { roomId: objId }] });
+                await roomsCollection.deleteOne({ _id: objId });
                 res.writeHead(200).end(JSON.stringify({ success: true }));
             } else {
                 res.writeHead(403).end(JSON.stringify({ error: 'Unauthorized deletion request' }));
@@ -173,7 +197,13 @@ const server = http.createServer(async (req, res) => {
     
     if (pathname.startsWith('/api/messages/') && req.method === 'GET') {
         const roomId = pathname.split('/')[3];
-        const messages = await messagesCollection.find({ roomId }).sort({ timestamp: 1 }).toArray();
+        const objId = safelyGetObjectId(roomId);
+        
+        // Find messages where the roomId matches either the string format or the ObjectId format
+        const messages = await messagesCollection.find({ 
+            $or: [{ roomId: roomId }, { roomId: objId }] 
+        }).sort({ timestamp: 1 }).toArray();
+        
         return res.writeHead(200).end(JSON.stringify({ messages }));
     }
     
