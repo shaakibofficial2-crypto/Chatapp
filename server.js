@@ -21,8 +21,6 @@ const RATE_LIMIT_WINDOW_MS = 60 * 1000;
 const RATE_LIMIT_MAX_REQUESTS = 60;
 const MAX_NAME_LEN = 50;
 const MAX_ROOM_NAME_LEN = 50;
-const MAX_MESSAGE_LEN = 2000;
-const MAX_REPORT_LEN = 1000;
 
 async function connectDB() {
     try {

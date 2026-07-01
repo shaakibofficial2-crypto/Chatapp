@@ -4,6 +4,7 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>ChatApp - Modern Room Chat</title>
+    <script src="https://accounts.google.com/gsi/client" async defer></script>
     <style>
         * { margin: 0; padding: 0; box-sizing: border-box; font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif; }
         
@@ -20,6 +21,9 @@
             --bubble-received: #202c33;
             --input-bg: #2a3942;
             --btn-hover: #182229;
+            --wa-bg-dark: #0b141a;
+            --wa-surface: #111b21;
+            --wa-divider: #222e35;
         }
 
         body.light-mode {
@@ -35,6 +39,9 @@
             --bubble-received: #ffffff;
             --input-bg: #ffffff;
             --btn-hover: #f0f2f5;
+            --wa-bg-dark: #f0f2f5;
+            --wa-surface: #ffffff;
+            --wa-divider: #e9edef;
         }
 
         body { 
@@ -83,6 +90,20 @@
             display: flex; 
             justify-content: space-between; 
             align-items: center; 
+            gap: 10px;
+        }
+
+        .user-info-left {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+        }
+
+        .user-info img {
+            width: 30px;
+            height: 30px;
+            border-radius: 50%;
+            object-fit: cover;
         }
         
         .settings-btn { 
@@ -147,7 +168,6 @@
         }
         .chat-header h3 { font-size: 16px; font-weight: 600; color: var(--text-primary); }
 
-        /* WhatsApp Wallpaper Backdrop effect */
         .messages-area { 
             flex: 1; 
             overflow-y: auto; 
@@ -157,7 +177,6 @@
             gap: 12px; 
         }
         
-        /* Message Bubbles Structure */
         .message { display: flex; width: 100%; }
         .message.sent { justify-content: flex-end; }
         .message.received { justify-content: flex-start; }
@@ -219,11 +238,165 @@
         .modal-content { background: var(--bg-header); padding: 30px; border-radius: 16px; width: 90%; max-width: 420px; border: 1px solid var(--border-color); box-shadow: 0 24px 64px rgba(0,0,0,0.24); }
         .modal-content h2 { font-size: 20px; margin-bottom: 20px; color: var(--text-primary); }
         .modal-content input, .modal-content select { width: 100%; padding: 12px; margin-bottom: 16px; border-radius: 8px; border: 1px solid var(--border-color); background: var(--input-bg); color: var(--text-primary); outline: none; font-size: 15px; }
-        .modal-buttons { display: flex; gap: 10px; margin-top: 10px; }
         
-        .setting-row { display: flex; justify-content: space-between; align-items: center; margin-bottom: 20px; color: var(--text-primary); font-size: 15px; }
-        .setting-row select { width: auto; margin-bottom: 0; padding: 6px 12px; }
-        .setting-row input[type="checkbox"] { width: 18px; height: 18px; accent-color: var(--accent-green); cursor: pointer; }
+        /* WhatsApp Settings Drawer Overrides */
+        .settings-drawer {
+            background-color: var(--wa-bg-dark);
+            color: var(--text-primary);
+            width: 100%;
+            max-width: 420px;
+            height: 100vh;
+            display: flex;
+            flex-direction: column;
+            box-shadow: -4px 0 24px rgba(0,0,0,0.3);
+        }
+
+        .settings-header {
+            display: flex;
+            align-items: center;
+            padding: 16px;
+            background-color: var(--bg-header);
+            gap: 20px;
+            border-bottom: 1px solid var(--border-color);
+        }
+
+        .back-btn {
+            background: none;
+            border: none;
+            color: var(--text-primary);
+            cursor: pointer;
+            display: flex;
+            align-items: center;
+        }
+
+        .profile-hero-card {
+            display: flex;
+            align-items: center;
+            padding: 20px 16px;
+            cursor: pointer;
+            background-color: var(--wa-bg-dark);
+            transition: background 0.2s;
+        }
+
+        .profile-hero-card:hover {
+            background-color: var(--bg-header);
+        }
+
+        .avatar-wrapper {
+            position: relative;
+            margin-right: 15px;
+        }
+
+        .avatar-wrapper img {
+            width: 65px;
+            height: 65px;
+            border-radius: 50%;
+            object-fit: cover;
+            border: 1px solid var(--border-color);
+        }
+
+        .camera-badge {
+            position: absolute;
+            bottom: 0;
+            right: 0;
+            background-color: var(--accent-green);
+            padding: 5px;
+            border-radius: 50%;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+        }
+
+        .profile-hero-info {
+            flex-grow: 1;
+        }
+
+        .profile-hero-info h3 {
+            margin: 0 0 4px 0;
+            font-size: 18px;
+            font-weight: 500;
+        }
+
+        .profile-hero-info p {
+            margin: 0;
+            color: var(--text-secondary);
+            font-size: 14px;
+            word-break: break-all;
+        }
+
+        .icon-green {
+            color: var(--accent-green);
+        }
+
+        .settings-divider {
+            border: 0;
+            height: 1px;
+            background-color: var(--wa-divider);
+            margin: 0;
+        }
+
+        .settings-options-list {
+            flex: 1;
+            overflow-y: auto;
+            padding-top: 10px;
+        }
+
+        .settings-row {
+            display: flex;
+            align-items: center;
+            padding: 16px 24px;
+            cursor: pointer;
+            gap: 25px;
+            transition: background 0.2s;
+        }
+
+        .settings-row:hover {
+            background-color: var(--bg-header);
+        }
+
+        .row-icon svg {
+            fill: var(--text-secondary);
+        }
+
+        .settings-row:hover .row-icon svg {
+            fill: var(--accent-green);
+        }
+
+        .row-text {
+            flex: 1;
+        }
+
+        .row-text h4 {
+            margin: 0 0 2px 0;
+            font-size: 16px;
+            font-weight: 400;
+        }
+
+        .row-text p {
+            margin: 0;
+            color: var(--text-secondary);
+            font-size: 13px;
+        }
+
+        .theme-select-wrapper {
+            padding: 16px 24px;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            background: var(--bg-header);
+            margin: 10px 0;
+            border-top: 1px solid var(--border-color);
+            border-bottom: 1px solid var(--border-color);
+        }
+
+        .theme-select-wrapper select {
+            padding: 6px 12px;
+            border-radius: 6px;
+            background: var(--input-bg);
+            color: var(--text-primary);
+            border: 1px solid var(--border-color);
+            outline: none;
+        }
 
         .empty-state {
             display: flex;
@@ -271,28 +444,51 @@
         function renderSetup() {
             const m = document.getElementById('setupModal');
             m.innerHTML = `
-                <div class="modal-content">
-                    <h2>Create Profile</h2>
-                    <input type="text" id="name" placeholder="Full Name">
-                    <input type="email" id="email" placeholder="Email Address">
-                    <input type="tel" id="phone" placeholder="Phone Number">
-                    <div class="modal-buttons"><button onclick="saveUser()">Get Started</button></div>
+                <div class="modal-content" style="text-align: center;">
+                    <h2>Welcome to ChatApp</h2>
+                    <p style="color: var(--text-secondary); margin-bottom: 25px; font-size: 14px;">
+                        Please authenticate with your Google account to access your rooms and conversations securely.
+                    </p>
+                    
+                    <div style="display: flex; justify-content: center; margin-top: 15px;">
+                        <div id="g_id_onload"
+                             data-client_id="157699985261-179mbdt1jlpv4qm85vtkrmkg37mdiie3.apps.googleusercontent.com"
+                             data-callback="handleCredentialResponse"
+                             data-auto_prompt="false">
+                        </div>
+                        <div class="g_id_signin" data-type="standard" data-size="large" data-theme="filled_blue" data-text="signin_with" data-shape="rectangular"></div>
+                    </div>
                 </div>`;
             m.classList.add('show');
+            
+            if (window.google) {
+                google.accounts.id.initialize({
+                    client_id: "157699985261-179mbdt1jlpv4qm85vtkrmkg37mdiie3.apps.googleusercontent.com",
+                    callback: handleCredentialResponse
+                });
+                google.accounts.id.renderButton(
+                    document.querySelector(".g_id_signin"),
+                    { theme: "filled_blue", size: "large" }
+                );
+            }
         }
 
-        async function saveUser() {
-            const data = { name: document.getElementById('name').value, email: document.getElementById('email').value, phone: document.getElementById('phone').value };
-            if (!data.name || !data.email) return alert('Name and Email required');
-            const res = await api('/init-user', 'POST', data);
-            app.user = res.user;
-            localStorage.setItem('user', JSON.stringify(app.user));
-            applyTheme(app.user.settings?.theme || 'dark');
-            document.getElementById('setupModal').classList.remove('show');
-            renderMain(); sync();
+        async function handleCredentialResponse(response) {
+            const res = await api('/auth/google', 'POST', { token: response.credential });
+            if (res.success) {
+                app.user = res.user;
+                localStorage.setItem('user', JSON.stringify(app.user));
+                applyTheme(app.user.settings?.theme || 'dark');
+                document.getElementById('setupModal').classList.remove('show');
+                renderMain(); 
+                sync();
+            } else {
+                alert('Authentication failed: ' + (res.error || 'Unknown error'));
+            }
         }
 
         function renderMain() {
+            const userAvatar = app.user.avatar || 'https://via.placeholder.com/150';
             document.getElementById('app').innerHTML = `
                 <div class="container">
                     <div class="sidebar">
@@ -302,7 +498,10 @@
                                 <button class="settings-btn" onclick="showSettingsModal()">⚙️ Settings</button>
                             </div>
                             <div class="user-info">
-                                <span>Logged in as: <strong>${app.user.name}</strong></span>
+                                <div class="user-info-left">
+                                    <img src="${userAvatar}" alt="Avatar">
+                                    <span>Logged in as: <strong>${app.user.name}</strong></span>
+                                </div>
                             </div>
                         </div>
                         <div class="action-buttons">
@@ -320,151 +519,3 @@
                 </div>`;
             updateRooms();
         }
-
-        function showSettingsModal() {
-            const m = document.getElementById('settingsModal');
-            const currentSettings = app.user.settings || { theme: 'dark', notifications: true, soundEnabled: true };
-            m.innerHTML = `
-                <div class="modal-content">
-                    <h2>Settings</h2>
-                    <div class="setting-row">
-                        <label>Theme</label>
-                        <select id="settingTheme">
-                            <option value="dark" ${currentSettings.theme === 'dark' ? 'selected' : ''}>Dark</option>
-                            <option value="light" ${currentSettings.theme === 'light' ? 'selected' : ''}>Light</option>
-                        </select>
-                    </div>
-                    <div class="setting-row">
-                        <label>Notifications</label>
-                        <input type="checkbox" id="settingNotify" ${currentSettings.notifications ? 'checked' : ''}>
-                    </div>
-                    <div class="setting-row">
-                        <label>Sound Effects</label>
-                        <input type="checkbox" id="settingSound" ${currentSettings.soundEnabled ? 'checked' : ''}>
-                    </div>
-                    <div class="modal-buttons">
-                        <button onclick="saveSettings()">Save</button>
-                        <button class="secondary" onclick="document.getElementById('settingsModal').classList.remove('show')">Cancel</button>
-                    </div>
-                </div>`;
-            m.classList.add('show');
-        }
-
-        async function saveSettings() {
-            const selectedTheme = document.getElementById('settingTheme').value;
-            const updatedSettings = {
-                theme: selectedTheme,
-                notifications: document.getElementById('settingNotify').checked,
-                soundEnabled: document.getElementById('settingSound').checked
-            };
-
-            const res = await api('/update-settings', 'POST', {
-                email: app.user.email,
-                settings: updatedSettings
-            });
-
-            if (res.success) {
-                app.user.settings = res.settings;
-                localStorage.setItem('user', JSON.stringify(app.user));
-                applyTheme(res.settings.theme);
-                document.getElementById('settingsModal').classList.remove('show');
-                renderMain();
-            }
-        }
-
-        function applyTheme(theme) {
-            if (theme === 'light') document.body.classList.add('light-mode');
-            else document.body.classList.remove('light-mode');
-        }
-
-        async function updateRooms() {
-            const res = await api('/rooms/' + app.user.email);
-            app.rooms = res.rooms || [];
-            document.getElementById('roomsList').innerHTML = app.rooms.map(r => `
-                <div class="room-item ${app.currentRoom?._id === r._id ? 'active' : ''}" onclick="selectRoom('${r._id}')">
-                    <strong>💬 ${r.roomName}</strong>
-                    <small>${r.members.length} participants</small>
-                </div>
-            `).join('');
-        }
-
-        async function selectRoom(id) {
-            app.currentRoom = app.rooms.find(r => r._id === id);
-            document.getElementById('mainArea').innerHTML = `
-                <div class="chat-header">
-                    <h3>${app.currentRoom.roomName}</h3>
-                </div>
-                <div class="messages-area" id="msgs"></div>
-                <div class="input-section">
-                    <input type="text" id="msgInput" placeholder="Type a message">
-                    <button onclick="sendMsg()">Send</button>
-                </div>`;
-            
-            // Allow pressing Enter key to send message smoothly
-            document.getElementById('msgInput').addEventListener('keypress', function(e) {
-                if (e.key === 'Enter') sendMsg();
-            });
-            updateMsgs();
-        }
-
-        async function updateMsgs() {
-            if (!app.currentRoom) return;
-            const res = await api('/messages/' + app.currentRoom._id);
-            const msgs = res.messages || [];
-            const box = document.getElementById('msgs');
-            box.innerHTML = msgs.map(m => {
-                const isMe = m.sender === app.user.email;
-                return `<div class="message ${isMe ? 'sent' : 'received'}">
-                    <div class="message-content">
-                        ${!isMe ? `<div class="message-user">${m.senderName}</div>` : ''}
-                        <div class="message-bubble">${m.text}</div>
-                    </div>
-                </div>`;
-            }).join('');
-            box.scrollTop = box.scrollHeight;
-        }
-
-        async function sendMsg() {
-            const input = document.getElementById('msgInput');
-            if (!input.value.trim()) return;
-            await api('/send-message', 'POST', { roomId: app.currentRoom._id, sender: app.user.email, senderName: app.user.name, text: input.value });
-            input.value = ''; updateMsgs();
-        }
-
-        function showRoomModal(type) {
-            const m = document.getElementById('roomModal');
-            const isCreate = type === 'create';
-            m.innerHTML = `
-                <div class="modal-content">
-                    <h2>${isCreate ? 'Create New Room' : 'Join Existing Room'}</h2>
-                    <input type="text" id="roomInput" placeholder="${isCreate ? 'Enter Room Name' : 'Paste Room ID'}">
-                    <div class="modal-buttons">
-                        <button onclick="${isCreate ? 'createRoom()' : 'joinRoom()'}">${isCreate ? 'Create' : 'Join'}</button>
-                        <button class="secondary" onclick="document.getElementById('roomModal').classList.remove('show')">Cancel</button>
-                    </div>
-                </div>`;
-            m.classList.add('show');
-        }
-
-        async function createRoom() {
-            const name = document.getElementById('roomInput').value;
-            if(!name.trim()) return;
-            const res = await api('/create-room', 'POST', { creator: app.user.email, roomName: name });
-            alert('Room Generated Successfully!\nShare this ID with friends: ' + res.roomId);
-            document.getElementById('roomModal').classList.remove('show');
-            updateRooms();
-        }
-
-        async function joinRoom() {
-            const id = document.getElementById('roomInput').value;
-            if(!id.trim()) return;
-            await api('/join-room', 'POST', { email: app.user.email, roomId: id });
-            document.getElementById('roomModal').classList.remove('show');
-            updateRooms();
-        }
-
-        function sync() { setInterval(() => { app.currentRoom ? updateMsgs() : updateRooms(); }, 2000); }
-        init();
-    </script>
-</body>
-</html>
