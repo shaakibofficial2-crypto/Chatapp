@@ -5,6 +5,7 @@ const http = require('http');
 const url = require('url');
 const fs = require('fs');
 const path = require('path');
+const https = require('https');
 const { MongoClient, ObjectId } = require('mongodb');
 
 const mongoUri = "mongodb+srv://shaaqibofficial_db_user:ShakibPass2026@cluster0.c2gzhsw.mongodb.net/?appName=Cluster0";
@@ -104,7 +105,6 @@ const server = http.createServer(async (req, res) => {
 
     if (req.method === 'OPTIONS') return res.writeHead(200).end();
 
-    // Fix for the annoying 404 Chrome Console Error
     if (pathname === '/favicon.ico') {
         res.writeHead(204); 
         return res.end();
@@ -129,26 +129,54 @@ const server = http.createServer(async (req, res) => {
         }
     }
 
-    if (pathname === '/api/init-user' && req.method === 'POST') {
+    /* Secure Google Authentication Endpoint */
+    if (pathname === '/api/auth/google' && req.method === 'POST') {
         let body = ''; req.on('data', c => body += c);
         req.on('end', async () => {
             const data = parseJSON(body);
-            if (!data) return sendJSON(res, 400, { error: 'Invalid JSON' });
-            const { name, email, avatar, isPrivate } = data;
+            if (!data || !data.token) return sendJSON(res, 400, { error: 'Missing token data' });
 
-            if (!isValidString(name, MAX_NAME_LEN)) return sendJSON(res, 400, { error: 'Invalid name' });
-            if (!isValidEmail(email)) return sendJSON(res, 400, { error: 'Invalid email' });
+            try {
+                const googleVerifyUrl = `https://oauth2.googleapis.com/tokeninfo?id_token=${data.token}`;
+                
+                https.get(googleVerifyUrl, (googleRes) => {
+                    let rawData = '';
+                    googleRes.on('data', (chunk) => rawData += chunk);
+                    googleRes.on('end', async () => {
+                        const payload = parseJSON(rawData);
+                        
+                        if (!payload || payload.error_description) {
+                            return sendJSON(res, 401, { error: 'Invalid Google Identity token' });
+                        }
 
-            let user = await usersCollection.findOne({ email });
-            if (!user) {
-                const defaultSettings = { theme: 'dark', notifications: true, soundEnabled: true };
-                const result = await usersCollection.insertOne({
-                    name, email, avatar: avatar || '', isPrivate: !!isPrivate,
-                    settings: defaultSettings, createdAt: new Date()
+                        const expectedClientId = "157699985261-179mbdt1jlpv4qm85vtkrmkg37mdiie3.apps.googleusercontent.com";
+                        if (payload.aud !== expectedClientId) {
+                            return sendJSON(res, 401, { error: 'Audience mismatch authentication failed' });
+                        }
+
+                        const email = payload.email;
+                        const name = payload.name;
+                        const avatar = payload.picture || '';
+
+                        let user = await usersCollection.findOne({ email });
+                        if (!user) {
+                            const defaultSettings = { theme: 'dark', notifications: true, soundEnabled: true };
+                            const result = await usersCollection.insertOne({
+                                name, email, avatar, isPrivate: false,
+                                settings: defaultSettings, createdAt: new Date()
+                            });
+                            user = { _id: result.insertedId, name, email, avatar, isPrivate: false, settings: defaultSettings };
+                        }
+
+                        sendJSON(res, 200, { success: true, user });
+                    });
+                }).on('error', (e) => {
+                    sendJSON(res, 500, { error: 'Google gateway verification system timeout' });
                 });
-                user = { _id: result.insertedId, name, email, avatar, isPrivate, settings: defaultSettings };
+
+            } catch (err) {
+                sendJSON(res, 500, { error: 'Internal Auth execution exception error' });
             }
-            sendJSON(res, 200, { success: true, user });
         });
         return;
     }
