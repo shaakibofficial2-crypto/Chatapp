@@ -14,11 +14,8 @@ if (!mongoUri) {
 const client = new MongoClient(mongoUri, { maxPoolSize: 15 });
 let db, usersCollection, roomsCollection, messagesCollection, reportsCollection;
 
-// ---------------------------------------------------------------------------
-// Hardcoded real-world settings (no .env needed for these — just constants)
-// ---------------------------------------------------------------------------
-const RATE_LIMIT_WINDOW_MS = 60 * 1000;   // 1 minute window
-const RATE_LIMIT_MAX_REQUESTS = 60;       // 60 requests per IP per window
+const RATE_LIMIT_WINDOW_MS = 60 * 1000;
+const RATE_LIMIT_MAX_REQUESTS = 60;
 const MAX_NAME_LEN = 50;
 const MAX_ROOM_NAME_LEN = 50;
 const MAX_MESSAGE_LEN = 2000;
@@ -33,7 +30,6 @@ async function connectDB() {
         messagesCollection = db.collection('messages');
         reportsCollection = db.collection('reports');
 
-        // Indexes — created once, MongoDB no-ops if they already exist
         await usersCollection.createIndex({ email: 1 }, { unique: true });
         await roomsCollection.createIndex({ roomId: 1 }, { unique: true });
         await roomsCollection.createIndex({ members: 1 });
@@ -54,18 +50,11 @@ function parseJSON(str) {
     try { return JSON.parse(str); } catch { return null; }
 }
 
-// Safely converts a string to a MongoDB ObjectId without crashing the server
 function safelyGetObjectId(id) {
-    try {
-        return ObjectId.isValid(id) ? new ObjectId(id) : null;
-    } catch (e) {
-        return null;
-    }
+    try { return ObjectId.isValid(id) ? new ObjectId(id) : null; } 
+    catch (e) { return null; }
 }
 
-// ---------------------------------------------------------------------------
-// Validation helpers
-// ---------------------------------------------------------------------------
 function isValidEmail(email) {
     return typeof email === 'string' && /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email) && email.length <= 254;
 }
@@ -74,9 +63,6 @@ function isValidString(str, maxLen) {
     return typeof str === 'string' && str.trim().length > 0 && str.length <= maxLen;
 }
 
-// ---------------------------------------------------------------------------
-// Rate limiting (in-memory, per IP)
-// ---------------------------------------------------------------------------
 const rateLimitMap = new Map();
 
 function isRateLimited(ip) {
@@ -90,7 +76,6 @@ function isRateLimited(ip) {
     return record.count > RATE_LIMIT_MAX_REQUESTS;
 }
 
-// Periodically clear stale rate-limit entries so the Map doesn't grow forever
 setInterval(() => {
     const now = Date.now();
     for (const [ip, record] of rateLimitMap.entries()) {
@@ -110,8 +95,6 @@ const server = http.createServer(async (req, res) => {
     res.setHeader('Access-Control-Allow-Origin', '*');
     res.setHeader('Access-Control-Allow-Methods', 'GET, POST, OPTIONS');
     res.setHeader('Access-Control-Allow-Headers', 'Content-Type');
-
-    // Basic security headers
     res.setHeader('X-Content-Type-Options', 'nosniff');
     res.setHeader('X-Frame-Options', 'DENY');
     res.setHeader('X-XSS-Protection', '1; mode=block');
@@ -119,17 +102,19 @@ const server = http.createServer(async (req, res) => {
 
     if (req.method === 'OPTIONS') return res.writeHead(200).end();
 
-    // Health check — used by Render to confirm the service is alive
+    // Fix for the annoying 404 Chrome Console Error
+    if (pathname === '/favicon.ico') {
+        res.writeHead(204); 
+        return res.end();
+    }
+
     if (pathname === '/api/health' && req.method === 'GET') {
         return sendJSON(res, 200, { status: 'ok', uptime: process.uptime() });
     }
 
-    // Rate limit all /api/* traffic
     if (pathname.startsWith('/api/')) {
         const ip = req.socket.remoteAddress || 'unknown';
-        if (isRateLimited(ip)) {
-            return sendJSON(res, 429, { error: 'Too many requests, slow down.' });
-        }
+        if (isRateLimited(ip)) return sendJSON(res, 429, { error: 'Too many requests, slow down.' });
     }
 
     if (pathname === '/' && req.method === 'GET') {
@@ -142,12 +127,11 @@ const server = http.createServer(async (req, res) => {
         }
     }
 
-    // Initialize User Profile Setup
     if (pathname === '/api/init-user' && req.method === 'POST') {
         let body = ''; req.on('data', c => body += c);
         req.on('end', async () => {
             const data = parseJSON(body);
-            if (!data) return sendJSON(res, 400, { error: 'Invalid JSON payload' });
+            if (!data) return sendJSON(res, 400, { error: 'Invalid JSON' });
             const { name, email, avatar, isPrivate } = data;
 
             if (!isValidString(name, MAX_NAME_LEN)) return sendJSON(res, 400, { error: 'Invalid name' });
@@ -167,139 +151,100 @@ const server = http.createServer(async (req, res) => {
         return;
     }
 
-    // Real-Time Update Profile (Name, Avatar, Privacy)
     if (pathname === '/api/update-profile' && req.method === 'POST') {
         let body = ''; req.on('data', c => body += c);
         req.on('end', async () => {
             const data = parseJSON(body);
-            if (!data) return sendJSON(res, 400, { error: 'Invalid JSON payload' });
+            if (!data) return sendJSON(res, 400, { error: 'Invalid JSON' });
             const { email, name, avatar, isPrivate } = data;
-
             if (!isValidEmail(email)) return sendJSON(res, 400, { error: 'Invalid email' });
-            if (!isValidString(name, MAX_NAME_LEN)) return sendJSON(res, 400, { error: 'Invalid name' });
-
             await usersCollection.updateOne({ email }, { $set: { name, avatar, isPrivate: !!isPrivate } });
             sendJSON(res, 200, { success: true });
         });
         return;
     }
 
-    // Update user settings (theme, notifications, sound)
     if (pathname === '/api/update-settings' && req.method === 'POST') {
         let body = ''; req.on('data', c => body += c);
         req.on('end', async () => {
             const data = parseJSON(body);
             if (!data) return sendJSON(res, 400, { error: 'Invalid JSON payload' });
             const { email, settings } = data;
-
             if (!isValidEmail(email)) return sendJSON(res, 400, { error: 'Invalid email' });
-            if (!settings || typeof settings !== 'object') return sendJSON(res, 400, { error: 'Invalid settings' });
-
+            
             const safeSettings = {
                 theme: settings.theme === 'light' ? 'light' : 'dark',
                 notifications: !!settings.notifications,
                 soundEnabled: !!settings.soundEnabled
             };
-
             await usersCollection.updateOne({ email }, { $set: { settings: safeSettings } });
             sendJSON(res, 200, { success: true, settings: safeSettings });
         });
         return;
     }
 
-    // Submit Direct Issue Report
     if (pathname === '/api/submit-report' && req.method === 'POST') {
         let body = ''; req.on('data', c => body += c);
         req.on('end', async () => {
-            const reportData = parseJSON(body);
-            if (!reportData) return sendJSON(res, 400, { error: 'Invalid JSON payload' });
-            if (!isValidEmail(reportData.sender)) return sendJSON(res, 400, { error: 'Invalid sender' });
-            if (!isValidString(reportData.details, MAX_REPORT_LEN)) return sendJSON(res, 400, { error: 'Invalid report details' });
-
-            reportData.timestamp = new Date();
-            await reportsCollection.insertOne(reportData);
+            const data = parseJSON(body);
+            if (!data) return sendJSON(res, 400, { error: 'Invalid JSON payload' });
+            data.timestamp = new Date();
+            await reportsCollection.insertOne(data);
             sendJSON(res, 200, { success: true });
         });
         return;
     }
 
-    // Create Room with Invite permissions by default
     if (pathname === '/api/create-room' && req.method === 'POST') {
         let body = ''; req.on('data', c => body += c);
         req.on('end', async () => {
             const data = parseJSON(body);
             if (!data) return sendJSON(res, 400, { error: 'Invalid JSON payload' });
-            const { creator, roomName } = data;
-
-            if (!isValidEmail(creator)) return sendJSON(res, 400, { error: 'Invalid creator email' });
-            if (!isValidString(roomName, MAX_ROOM_NAME_LEN)) return sendJSON(res, 400, { error: 'Invalid room name' });
-
             const roomId = generateRoomId();
-            await roomsCollection.insertOne({ roomId, roomName, creator, members: [creator], allowInvites: true, createdAt: new Date() });
+            await roomsCollection.insertOne({ roomId, roomName: data.roomName, creator: data.creator, members: [data.creator], allowInvites: true, createdAt: new Date() });
             sendJSON(res, 200, { success: true, roomId });
         });
         return;
     }
 
-    // Dynamic configuration modifier for invites
     if (pathname === '/api/room-allow-invites' && req.method === 'POST') {
         let body = ''; req.on('data', c => body += c);
         req.on('end', async () => {
             const data = parseJSON(body);
-            if (!data) return sendJSON(res, 400, { error: 'Invalid JSON payload' });
-            const { roomId, allowInvites } = data;
-            const objId = safelyGetObjectId(roomId);
-
-            if (!objId) return sendJSON(res, 400, { error: 'Invalid Room Identification format' });
-
-            await roomsCollection.updateOne({ _id: objId }, { $set: { allowInvites: !!allowInvites } });
+            if (!data) return sendJSON(res, 400, { error: 'Invalid JSON' });
+            const objId = safelyGetObjectId(data.roomId);
+            await roomsCollection.updateOne({ _id: objId }, { $set: { allowInvites: !!data.allowInvites } });
             sendJSON(res, 200, { success: true });
         });
         return;
     }
 
-    // Join Group validation logic checking restrictions
     if (pathname === '/api/join-room' && req.method === 'POST') {
         let body = ''; req.on('data', c => body += c);
         req.on('end', async () => {
             const data = parseJSON(body);
             if (!data) return sendJSON(res, 400, { error: 'Invalid JSON payload' });
-            const { email, roomId } = data;
-
-            if (!isValidEmail(email)) return sendJSON(res, 400, { error: 'Invalid email' });
-            if (!isValidString(roomId, 50)) return sendJSON(res, 400, { error: 'Invalid room ID' });
-
-            const targetRoom = await roomsCollection.findOne({ roomId });
+            const targetRoom = await roomsCollection.findOne({ roomId: data.roomId });
             if (!targetRoom) return sendJSON(res, 200, { error: 'Room does not exist' });
-            if (!targetRoom.allowInvites && targetRoom.creator !== email) {
-                return sendJSON(res, 200, { error: 'Room joins are currently locked by owner' });
-            }
-            await roomsCollection.updateOne({ roomId }, { $addToSet: { members: email } });
+            await roomsCollection.updateOne({ roomId: data.roomId }, { $addToSet: { members: data.email } });
             sendJSON(res, 200, { success: true });
         });
         return;
     }
 
-    // Permanent Group deletion endpoint
     if (pathname === '/api/delete-room' && req.method === 'POST') {
         let body = ''; req.on('data', c => body += c);
         req.on('end', async () => {
             const data = parseJSON(body);
-            if (!data) return sendJSON(res, 400, { error: 'Invalid JSON payload' });
-            const { id, email } = data;
-            const objId = safelyGetObjectId(id);
-
-            if (!objId) return sendJSON(res, 400, { error: 'Invalid Room reference mapping' });
-            if (!isValidEmail(email)) return sendJSON(res, 400, { error: 'Invalid email' });
-
+            if (!data) return sendJSON(res, 400, { error: 'Invalid JSON' });
+            const objId = safelyGetObjectId(data.id);
             const room = await roomsCollection.findOne({ _id: objId });
-            if (room && room.creator === email) {
-                // Wipe history messages tied to this space ID as both raw text and mapped ObjectId values
-                await messagesCollection.deleteMany({ $or: [{ roomId: id }, { roomId: objId }] });
+            if (room && room.creator === data.email) {
+                await messagesCollection.deleteMany({ $or: [{ roomId: data.id }, { roomId: objId }] });
                 await roomsCollection.deleteOne({ _id: objId });
                 sendJSON(res, 200, { success: true });
             } else {
-                sendJSON(res, 403, { error: 'Unauthorized deletion request' });
+                sendJSON(res, 403, { error: 'Unauthorized' });
             }
         });
         return;
@@ -307,7 +252,6 @@ const server = http.createServer(async (req, res) => {
 
     if (pathname.startsWith('/api/rooms/') && req.method === 'GET') {
         const email = pathname.split('/')[3];
-        if (!isValidEmail(email)) return sendJSON(res, 400, { error: 'Invalid email' });
         const rooms = await roomsCollection.find({ members: email }).toArray();
         return sendJSON(res, 200, { rooms });
     }
@@ -316,15 +260,8 @@ const server = http.createServer(async (req, res) => {
         let body = ''; req.on('data', c => body += c);
         req.on('end', async () => {
             const data = parseJSON(body);
-            if (!data) return sendJSON(res, 400, { error: 'Invalid JSON payload' });
-            const { roomId, sender, senderName, text } = data;
-
-            if (!isValidString(roomId, 50)) return sendJSON(res, 400, { error: 'Invalid roomId' });
-            if (!isValidEmail(sender)) return sendJSON(res, 400, { error: 'Invalid sender' });
-            if (!isValidString(senderName, MAX_NAME_LEN)) return sendJSON(res, 400, { error: 'Invalid senderName' });
-            if (!isValidString(text, MAX_MESSAGE_LEN)) return sendJSON(res, 400, { error: 'Invalid message text' });
-
-            await messagesCollection.insertOne({ roomId, sender, senderName, text, timestamp: Date.now() });
+            if (!data) return sendJSON(res, 400, { error: 'Invalid JSON' });
+            await messagesCollection.insertOne({ roomId: data.roomId, sender: data.sender, senderName: data.senderName, text: data.text, timestamp: Date.now() });
             sendJSON(res, 200, { success: true });
         });
         return;
@@ -333,12 +270,7 @@ const server = http.createServer(async (req, res) => {
     if (pathname.startsWith('/api/messages/') && req.method === 'GET') {
         const roomId = pathname.split('/')[3];
         const objId = safelyGetObjectId(roomId);
-
-        // Find messages where the roomId matches either the string format or the ObjectId format
-        const messages = await messagesCollection.find({
-            $or: [{ roomId: roomId }, { roomId: objId }]
-        }).sort({ timestamp: 1 }).toArray();
-
+        const messages = await messagesCollection.find({ $or: [{ roomId: roomId }, { roomId: objId }] }).sort({ timestamp: 1 }).toArray();
         return sendJSON(res, 200, { messages });
     }
 
