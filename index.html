@@ -26,8 +26,9 @@
         .container { display: flex; height: 100vh; width: 100vw; }
         .sidebar { width: 320px; border-right: 1px solid var(--dark-border); display: flex; flex-direction: column; background: var(--dark-card); height: 100%; }
         .main { flex: 1; display: flex; flex-direction: column; background: var(--dark-bg); }
-        .sidebar-header { padding: 16px; border-bottom: 1px solid var(--dark-border); }
-        .user-info { font-size: 12px; color: var(--text-secondary); padding: 8px; background: var(--dark-bg); border-radius: 6px; margin-top: 10px; }
+        .sidebar-header { padding: 16px; border-bottom: 1px solid var(--dark-border); position: relative; }
+        .user-info { font-size: 12px; color: var(--text-secondary); padding: 8px; background: var(--dark-bg); border-radius: 6px; margin-top: 10px; display: flex; justify-content: space-between; align-items: center; }
+        .settings-btn { background: none; border: none; color: var(--primary); cursor: pointer; font-size: 14px; font-weight: bold; }
         .action-buttons, .sidebar-footer { padding: 12px 16px; display: flex; gap: 8px; border-bottom: 1px solid var(--dark-border); }
         .action-buttons button, .sidebar-footer button, .modal-buttons button { flex: 1; padding: 10px; background: var(--primary); color: white; border: none; border-radius: 8px; cursor: pointer; font-weight: 600; }
         .action-buttons button.secondary, .modal-buttons button.secondary { background: var(--dark-border); color: var(--text-primary); }
@@ -50,6 +51,8 @@
         .modal.show { display: flex; }
         .modal-content { background: var(--dark-card); padding: 24px; border-radius: 12px; width: 90%; max-width: 400px; }
         .modal-content input { width: 100%; padding: 10px; margin-bottom: 12px; border-radius: 8px; border: 1px solid var(--dark-border); background: var(--dark-bg); color: white; outline: none; }
+        .setting-row { display: flex; justify-content: space-between; align-items: center; margin-bottom: 16px; color: var(--text-primary); }
+        .setting-row select, .setting-row input[type="checkbox"] { padding: 6px; background: var(--dark-bg); color: var(--text-primary); border: 1px solid var(--dark-border); border-radius: 4px; }
         @media (max-width: 768px) { .sidebar { width: 100%; position: absolute; left: 0; top: 0; transform: translateX(-100%); transition: 0.3s; z-index: 100; } .main { width: 100%; } }
     </style>
 </head>
@@ -57,6 +60,7 @@
     <div id="app"></div>
     <div id="setupModal" class="modal"></div>
     <div id="roomModal" class="modal"></div>
+    <div id="settingsModal" class="modal"></div>
     
     <script>
         const API = window.location.origin + '/api';
@@ -70,7 +74,12 @@
 
         function init() {
             const saved = localStorage.getItem('user');
-            if (saved) { app.user = JSON.parse(saved); renderMain(); sync(); } 
+            if (saved) { 
+                app.user = JSON.parse(saved); 
+                applyTheme(app.user.settings?.theme || 'dark');
+                renderMain(); 
+                sync(); 
+            } 
             else renderSetup();
         }
 
@@ -93,6 +102,7 @@
             const res = await api('/init-user', 'POST', data);
             app.user = res.user;
             localStorage.setItem('user', JSON.stringify(app.user));
+            applyTheme(app.user.settings?.theme || 'dark');
             document.getElementById('setupModal').classList.remove('show');
             renderMain(); sync();
         }
@@ -103,7 +113,10 @@
                     <div class="sidebar">
                         <div class="sidebar-header">
                             <h2>Rooms</h2>
-                            <div class="user-info">${app.user.name} | ${app.user.email}</div>
+                            <div class="user-info">
+                                <span>${app.user.name}</span>
+                                <button class="settings-btn" onclick="showSettingsModal()">⚙️ Settings</button>
+                            </div>
                         </div>
                         <div class="action-buttons">
                             <button onclick="showRoomModal('create')">Create Room</button>
@@ -116,6 +129,68 @@
                     </div>
                 </div>`;
             updateRooms();
+        }
+
+        function showSettingsModal() {
+            const m = document.getElementById('settingsModal');
+            const currentSettings = app.user.settings || { theme: 'dark', notifications: true, soundEnabled: true };
+            m.innerHTML = `
+                <div class="modal-content">
+                    <h2>Application Settings</h2>
+                    <br>
+                    <div class="setting-row">
+                        <label>Display Theme</label>
+                        <select id="settingTheme">
+                            <option value="dark" ${currentSettings.theme === 'dark' ? 'selected' : ''}>Dark Mode</option>
+                            <option value="light" ${currentSettings.theme === 'light' ? 'selected' : ''}>Light Mode</option>
+                        </select>
+                    </div>
+                    <div class="setting-row">
+                        <label>Enable Notifications</label>
+                        <input type="checkbox" id="settingNotify" ${currentSettings.notifications ? 'checked' : ''}>
+                    </div>
+                    <div class="setting-row">
+                        <label>Sound Effects</label>
+                        <input type="checkbox" id="settingSound" ${currentSettings.soundEnabled ? 'checked' : ''}>
+                    </div>
+                    <div class="modal-buttons">
+                        <button onclick="saveSettings()">Save Settings</button>
+                        <button class="secondary" onclick="document.getElementById('settingsModal').classList.remove('show')">Cancel</button>
+                    </div>
+                </div>`;
+            m.classList.add('show');
+        }
+
+        async function saveSettings() {
+            const selectedTheme = document.getElementById('settingTheme').value;
+            const updatedSettings = {
+                theme: selectedTheme,
+                notifications: document.getElementById('settingNotify').checked,
+                soundEnabled: document.getElementById('settingSound').checked
+            };
+
+            const res = await api('/update-settings', 'POST', {
+                email: app.user.email,
+                settings: updatedSettings
+            });
+
+            if (res.success) {
+                app.user.settings = res.settings;
+                localStorage.setItem('user', JSON.stringify(app.user));
+                applyTheme(res.settings.theme);
+                document.getElementById('settingsModal').classList.remove('show');
+                renderMain();
+            } else {
+                alert('Failed to save settings variables.');
+            }
+        }
+
+        function applyTheme(theme) {
+            if (theme === 'light') {
+                document.body.classList.add('light-mode');
+            } else {
+                document.body.classList.remove('light-mode');
+            }
         }
 
         async function updateRooms() {
